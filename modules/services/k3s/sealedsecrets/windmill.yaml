@@ -1,0 +1,14 @@
+---
+apiVersion: bitnami.com/v1alpha1
+kind: SealedSecret
+metadata:
+  name: windmill-db-url
+  namespace: windmill
+spec:
+  encryptedData:
+    url: AgABJK7VjHuHp2n2DDqARSEcP12f1V/1OkHb1pUwgYSgnqQhuDM+mDl7Fg9jukfM/v0owFei/0PQs3b759cwdRqxScLBYCQWBlyfWCxMyX+TG4QyQdKtkS+fEe5iRRo/scoyCmI2EuXqYjaZOoaMply7Q2TNZ3bVX2+y166oMNOVSP2Aq30NIvVfhBm55iqnCCUMO2s2Hpkmx4otEHVpJa09uSL12wKCcjIuMzwyXgZ52HrvIsLxVcIpsz0PQlkH1dEln3isrqsMM+JWWr6u+PcfrBenWNkuU32ptJRo6HNGjuQXCYMDxWp5uM0vGFDM3tiBjDtZDDkVZf9OOG1L3RwgYuO9LkYB9tHA0/khzJaESiB63UMKlHBwt/go/tOsJmmh/ltX10ppHROeIiSDpto/ihL7W/lhcqyODJHw/HwWT6AwoJpRpAje/Gjmk/6LKxRWIvFplo8P3D9+to3Q9bGbeuysKaj9GgnW7U0BViTolVGlrWe6hcpPE8LB6ZCZOX382skAhVtMSarlPIRZkn8eBuOTl1Emm7hO9DDFFlJ32FcZgmlXwcwP5nsfW8SFfI85esXLK+Cm67xB/UFvdgWxWdrHj0VJnhdgD3gFKBuqPI0tJEMVB7EmiGWSwOGZvhiLyyU9WiyUyqMc21PzCUTKkXXIaTY7tGcZtjx8iPNuVPUq6iiH3kpSmlnuAp0gJBsvDg/wjqnNQV9R1P7ZSXKKvWExFb3eTpaCs3QXxZ99yFuLKqb975s2/bXgnTtVpK6IFbKvQMQe2n/LF9fAy4eE7pZe62arkjXhYKKru8CwLFDkQGH5MYSna2uerNNRy3Yj2qam7L8qQPtZA8naHfIaBw5lgc12LOMKouo=
+  template:
+    metadata:
+      name: windmill-db-url
+      namespace: windmill
+    type: Opaque
