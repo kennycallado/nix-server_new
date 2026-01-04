@@ -1,1 +1,11 @@
-{}
+{
+  "server-01": {
+    "public_key": "it3v1PIyMe2DrbiChELtPJEAND+5NbAf6YHU/cqyRAo="
+  },
+  "agent-01": {
+    "public_key": "FfZMZrwyycV/o56g/e9cB4PgU8YqeYwG5G5NItr+Ij0="
+  },
+  "agent-02": {
+    "public_key": "xNTg6EmpCWe/PzbO6bd1SlBaye6fnF6AfunNyKfmy1g="
+  }
+}
