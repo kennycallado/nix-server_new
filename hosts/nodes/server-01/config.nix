@@ -1,10 +1,15 @@
 {
-  hostname = "server_01";
+  hostname = "server-01";
   system = "aarch64-linux";
   disk = "/dev/sda";
 
+  infra = {
+    provider = "hetzner";
+    type = "cax11";
+    location = "fsn1";
+  };
+
   deploy = {
-    ip = "46.224.152.241";
     sshUser = "admin";
     remoteBuild = true;
   };
@@ -18,7 +23,6 @@
   wireguard = {
     enable = true;
     ip = "10.100.10.1";
-    publicKey = "it3v1PIyMe2DrbiChELtPJEAND+5NbAf6YHU/cqyRAo=";
     isServer = true;
   };
 

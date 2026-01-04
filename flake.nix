@@ -39,6 +39,7 @@
         mkNode {
           inherit nixpkgs disko agenix deploy-rs hosts;
           configDir = ./hosts/nodes/${name};
+          root = ./.;
         }
       );
     in

@@ -29,8 +29,10 @@ in
       "SSH_KEYGEN_BIN='${pkgs.openssh}/bin/ssh-keygen'"
       "AGENIX_BIN='${agenix-pkg}/bin/agenix'"
       "SCRIPT_BIN='${pkgs.util-linux}/bin/script'"
+      "WG_BIN='${pkgs.wireguard-tools}/bin/wg'"
+      "JQ_BIN='${pkgs.jq}/bin/jq'"
     ]);
-    meta.description = "Generate SSH and age keys for a host";
+    meta.description = "Generate SSH and WireGuard keys for a host";
   };
 
   rekey = {
@@ -47,6 +49,7 @@ in
     program = toString (wrapScript "install" ./scripts/install.sh [
       "AGE_BIN='${pkgs.age}/bin/age'"
       "NIXOS_ANYWHERE_BIN='${nixos-anywhere-pkg}/bin/nixos-anywhere'"
+      "JQ_BIN='${pkgs.jq}/bin/jq'"
     ]);
     meta.description = "Install NixOS on a remote host";
   };
@@ -67,6 +70,15 @@ in
       "KUBESEAL_BIN='${pkgs.kubeseal}/bin/kubeseal'"
     ]);
     meta.description = "Seal Kubernetes secrets with kubeseal";
+  };
+
+  status = {
+    type = "app";
+    program = toString (wrapScript "status" ./scripts/status.sh [
+      "HCLOUD_BIN='${pkgs.hcloud}/bin/hcloud'"
+      "JQ_BIN='${pkgs.jq}/bin/jq'"
+    ]);
+    meta.description = "Show cluster status (local vs Hetzner)";
   };
 
   agenix = {

@@ -5,6 +5,7 @@
 #   node = mkNode {
 #     inherit nixpkgs disko agenix deploy-rs;
 #     configDir = ./hosts/nodes/server_01;
+#     root = ./.;
 #     hosts = import ./modules/network/hosts.nix;
 #   };
 #   # node.nixosConfig - NixOS system configuration
@@ -16,12 +17,17 @@
 #   agenix    - agenix input
 #   deploy-rs - deploy-rs input
 #   configDir - Path to node directory (containing config.nix)
+#   root      - Project root path (for state.nix)
 #   hosts     - Aggregated hosts data from modules/network/hosts.nix
 
-{ nixpkgs, disko, agenix, deploy-rs, configDir, hosts }:
+{ nixpkgs, disko, agenix, deploy-rs, configDir, root, hosts }:
 let
-  # Import node configuration
-  conf = import (configDir + "/config.nix");
+  # Import raw node configuration
+  rawConf = import (configDir + "/config.nix");
+
+  # Import state layer and merge with config
+  state = import (root + "/lib/state.nix") { inherit root; };
+  conf = state.mergeNode rawConf.hostname rawConf;
 
   # Import centralized constants
   constants = import ./constants.nix;

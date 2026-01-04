@@ -1,0 +1,12 @@
+{
+  "server-01": {
+    "provider": "hetzner",
+    "provider_id": 116711846,
+    "public_ip": "5.75.153.143",
+    "type": "cax21",
+    "location": "nbg1",
+    "status": "running",
+    "created_at": "2026-01-04T12:17:02+01:00",
+    "updated_at": "2026-01-04T12:23:16+01:00"
+  }
+}

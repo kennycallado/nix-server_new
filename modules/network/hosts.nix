@@ -1,32 +1,42 @@
 # Auto-descubrimiento de nodos desde hosts/nodes/*/config.nix
 # Cada config.nix es la fuente de verdad de su propio nodo
+# State (IPs, keys) se inyecta desde hosts/state/*.json via lib/state.nix
 let
-  nodesDir = ../../hosts/nodes;
+  root = ../../.;
+  nodesDir = root + "/hosts/nodes";
 
   # Usar lib/discover.nix para descubrir nodos
   discover = import ../../lib/discover.nix;
   nodeNames = discover nodesDir;
 
-  # Importar configs
+  # Import state layer for merging
+  state = import ../../lib/state.nix { inherit root; };
+
+  # Importar y mergear configs con state
   nodeConfigs = builtins.listToAttrs (map
-    (name: {
-      inherit name;
-      value = import (nodesDir + "/${name}/config.nix");
-    })
+    (name:
+      let
+        rawConf = import (nodesDir + "/${name}/config.nix");
+      in
+      {
+        inherit name;
+        value = state.mergeNode name rawConf;
+      })
     nodeNames);
 
-  # Validar un nodo
+  # Validar un nodo (deploy.ip y wireguard.publicKey ahora vienen del state)
   validate = name: cfg:
     let
       check = cond: msg: if !cond then throw "Node '${name}': ${msg}" else true;
+      checkNotNull = val: msg: if val == null then throw "Node '${name}': ${msg}" else true;
     in
     check (cfg ? hostname) "missing 'hostname'" &&
     check (cfg.hostname == name) "hostname '${cfg.hostname}' doesn't match directory" &&
-    check (cfg ? deploy.ip) "missing 'deploy.ip'" &&
+    checkNotNull (cfg.deploy.ip or null) "missing 'deploy.ip' (check hosts/state/nodes.json)" &&
     check (cfg ? wireguard.enable) "missing 'wireguard.enable'" &&
     (if cfg.wireguard.enable then
       check (cfg ? wireguard.ip) "missing 'wireguard.ip'" &&
-      check (cfg ? wireguard.publicKey) "missing 'wireguard.publicKey'" &&
+      checkNotNull (cfg.wireguard.publicKey or null) "missing 'wireguard.publicKey' (check hosts/state/wireguard.json)" &&
       check (cfg ? wireguard.isServer) "missing 'wireguard.isServer'"
     else true);
 

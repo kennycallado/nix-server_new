@@ -1,21 +1,50 @@
 #!/usr/bin/env bash
 # Instala NixOS en un servidor usando nixos-anywhere
-# Uso: install.sh <host> <ip>
-# Variables esperadas: AGE_BIN, NIXOS_ANYWHERE_BIN
+# Uso: install.sh <host> [ip]
+# Variables esperadas: AGE_BIN, NIXOS_ANYWHERE_BIN, JQ_BIN
 
 set -e
 HOST="${1:-}"
 IP="${2:-}"
 
-if [ -z "$HOST" ] || [ -z "$IP" ]; then
-  echo "Uso: nix run .#install -- <host> <ip>"
-  echo "Ejemplo: nix run .#install -- server_01 192.168.1.100"
+if [ -z "$HOST" ]; then
+  echo "Uso: nix run .#install -- <host> [ip]"
+  echo "Ejemplo: nix run .#install -- server_01"
+  echo "         nix run .#install -- server_01 192.168.1.100  (override IP)"
   exit 1
 fi
 
-SECRETS_DIR="$(pwd)/secrets"
+PROJECT_ROOT="$(pwd)"
+SECRETS_DIR="$PROJECT_ROOT/secrets"
+STATE_DIR="$PROJECT_ROOT/hosts/state"
+NODES_FILE="$STATE_DIR/nodes.json"
 AGE_FILE="$SECRETS_DIR/hosts/$HOST.age"
 PUB_FILE="$SECRETS_DIR/hosts/$HOST.pub"
+
+# Si no se proporciona IP, leerla de nodes.json
+if [ -z "$IP" ]; then
+  if [ ! -f "$NODES_FILE" ]; then
+    echo "Error: No existe $NODES_FILE"
+    echo "Crea el nodo primero o proporciona la IP manualmente."
+    exit 1
+  fi
+  
+  IP=$($JQ_BIN -r ".[\"$HOST\"].public_ip // empty" "$NODES_FILE")
+  
+  if [ -z "$IP" ]; then
+    echo "Error: No se encontró IP para '$HOST' en $NODES_FILE"
+    echo ""
+    echo "Opciones:"
+    echo "  1. Añade el nodo a nodes.json con su IP"
+    echo "  2. Proporciona la IP manualmente: nix run .#install -- $HOST <ip>"
+    echo ""
+    echo "Nodos disponibles en $NODES_FILE:"
+    $JQ_BIN -r 'keys[]' "$NODES_FILE" 2>/dev/null || echo "  (ninguno)"
+    exit 1
+  fi
+  
+  echo "IP obtenida de $NODES_FILE: $IP"
+fi
 
 if [ ! -f "$AGE_FILE" ] || [ ! -f "$PUB_FILE" ]; then
   echo "Error: No existen claves para $HOST"

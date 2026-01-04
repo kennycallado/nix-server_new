@@ -1,10 +1,15 @@
 {
-  hostname = "agent_02";
+  hostname = "agent-01";
   system = "aarch64-linux";
   disk = "/dev/sda";
 
+  infra = {
+    provider = "hetzner";
+    type = "cax11";
+    location = "fsn1";
+  };
+
   deploy = {
-    ip = "46.224.186.182";
     sshUser = "admin";
     remoteBuild = true;
   };
@@ -12,13 +17,12 @@
   k3s = {
     enable = true;
     role = "agent";
-    serverAddr = "https://server_01:6443"; # Usa nombre DNS vía WireGuard
+    serverAddr = "https://server-01:6443"; # Usa nombre DNS vía WireGuard
   };
 
   wireguard = {
     enable = true;
-    ip = "10.100.10.3";
-    publicKey = "xNTg6EmpCWe/PzbO6bd1SlBaye6fnF6AfunNyKfmy1g=";
+    ip = "10.100.10.2";
     isServer = false;
   };
 }
