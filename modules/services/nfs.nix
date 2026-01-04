@@ -1,4 +1,4 @@
-{ config, lib, conf, hosts, ... }:
+{ lib, conf, hosts, ... }:
 {
   config = lib.mkIf (conf.nfs.enable or false) {
     # Crear directorio NFS

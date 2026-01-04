@@ -5,8 +5,8 @@
 
   infra = {
     provider = "hetzner";
-    type = "cax11";
-    location = "fsn1";
+    type = "cax21";
+    location = "nbg1";
   };
 
   deploy = {

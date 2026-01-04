@@ -29,7 +29,7 @@ let
   # adminToken viene del SealedSecret garage-secrets
   garageWebuiConfig = {
     version = "latest";
-    s3Region = garageConfig.s3Region;
+    inherit (garageConfig) s3Region;
     # Autenticación básica (opcional)
     # Generar con: htpasswd -nbBC 10 "admin" "password"
     authUserPass = ""; # Formato: "username:$2y$10$..."

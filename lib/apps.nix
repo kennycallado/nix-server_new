@@ -1,6 +1,6 @@
 { pkgs, nixos-anywhere, agenix }:
 let
-  system = pkgs.stdenv.hostPlatform.system;
+  inherit (pkgs.stdenv.hostPlatform) system;
   nixos-anywhere-pkg = nixos-anywhere.packages.${system}.default;
   agenix-pkg = agenix.packages.${system}.default;
   constants = import ./constants.nix;
@@ -79,6 +79,15 @@ in
       "JQ_BIN='${pkgs.jq}/bin/jq'"
     ]);
     meta.description = "Show cluster status (local vs Hetzner)";
+  };
+
+  destroy = {
+    type = "app";
+    program = toString (wrapScript "destroy" ./scripts/destroy.sh [
+      "HCLOUD_BIN='${pkgs.hcloud}/bin/hcloud'"
+      "JQ_BIN='${pkgs.jq}/bin/jq'"
+    ]);
+    meta.description = "Destroy a node and clean up state";
   };
 
   agenix = {

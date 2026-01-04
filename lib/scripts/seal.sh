@@ -11,7 +11,7 @@ set -euo pipefail
 CERT_PATH="secrets/sealed-secrets-cert.pem"
 
 show_help() {
-    cat << EOF
+  cat <<EOF
 Seal Kubernetes Secrets with Sealed Secrets
 
 Usage:
@@ -43,15 +43,15 @@ EOF
 
 # Check if certificate exists
 if [[ ! -f "$CERT_PATH" ]]; then
-    echo "Error: Certificate not found at $CERT_PATH"
-    echo "Make sure you're running this from the repository root."
-    exit 1
+  echo "Error: Certificate not found at $CERT_PATH"
+  echo "Make sure you're running this from the repository root."
+  exit 1
 fi
 
 # Parse arguments
 if [[ $# -eq 0 ]]; then
-    show_help
-    exit 0
+  show_help
+  exit 0
 fi
 
 INPUT_FILE="$1"
@@ -59,14 +59,14 @@ OUTPUT_FILE="${2:-}"
 
 # Validate input file
 if [[ ! -f "$INPUT_FILE" ]]; then
-    echo "Error: Input file not found: $INPUT_FILE"
-    exit 1
+  echo "Error: Input file not found: $INPUT_FILE"
+  exit 1
 fi
 
 # Run kubeseal
 if [[ -n "$OUTPUT_FILE" ]]; then
-    "$KUBESEAL_BIN" --cert "$CERT_PATH" --format yaml < "$INPUT_FILE" > "$OUTPUT_FILE"
-    echo "Sealed secret saved to: $OUTPUT_FILE"
+  "$KUBESEAL_BIN" --cert "$CERT_PATH" --format yaml <"$INPUT_FILE" >"$OUTPUT_FILE"
+  echo "Sealed secret saved to: $OUTPUT_FILE"
 else
-    "$KUBESEAL_BIN" --cert "$CERT_PATH" --format yaml < "$INPUT_FILE"
+  "$KUBESEAL_BIN" --cert "$CERT_PATH" --format yaml <"$INPUT_FILE"
 fi

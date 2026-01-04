@@ -24,7 +24,12 @@ let
       })
     nodeNames);
 
-  # Validar un nodo (deploy.ip y wireguard.publicKey ahora vienen del state)
+  # Check if a node has required state (IP provisioned)
+  # Nodes without state are skipped in hosts map (not yet provisioned)
+  hasRequiredState = name: cfg:
+    (cfg.deploy.ip or null) != null;
+
+  # Validar un nodo (solo nodos con state - ya provisionados)
   validate = name: cfg:
     let
       check = cond: msg: if !cond then throw "Node '${name}': ${msg}" else true;
@@ -32,7 +37,6 @@ let
     in
     check (cfg ? hostname) "missing 'hostname'" &&
     check (cfg.hostname == name) "hostname '${cfg.hostname}' doesn't match directory" &&
-    checkNotNull (cfg.deploy.ip or null) "missing 'deploy.ip' (check hosts/state/nodes.json)" &&
     check (cfg ? wireguard.enable) "missing 'wireguard.enable'" &&
     (if cfg.wireguard.enable then
       check (cfg ? wireguard.ip) "missing 'wireguard.ip'" &&
@@ -40,15 +44,17 @@ let
       check (cfg ? wireguard.isServer) "missing 'wireguard.isServer'"
     else true);
 
-  # Validar todos
-  allValid = builtins.all (name: validate name nodeConfigs.${name}) nodeNames;
+  # Solo validar nodos que tienen state (IP provisionada)
+  provisionedNodes = builtins.filter (name: hasRequiredState name nodeConfigs.${name}) nodeNames;
+  allValid = builtins.all (name: validate name nodeConfigs.${name}) provisionedNodes;
 
-  # Construir estructura de nodos (solo con WireGuard habilitado)
+  # Construir estructura de nodos (solo provisionados con WireGuard habilitado)
   nodes = assert allValid; builtins.listToAttrs (
     builtins.filter (x: x != null) (map
       (name:
         let cfg = nodeConfigs.${name}; in
-        if cfg.wireguard.enable or false then {
+        # Solo incluir si tiene IP (provisionado) Y WireGuard habilitado
+        if (hasRequiredState name cfg) && (cfg.wireguard.enable or false) then {
           inherit name;
           value = {
             ip.public = cfg.deploy.ip;
@@ -99,6 +105,7 @@ in
   inherit nodes;
 
   # External clients (no config.nix, manually defined)
+  # TODO: read from a separate file?
   clients = {
     ryzen = {
       ip.wg = "10.100.10.100";

@@ -1,4 +1,4 @@
-{ pkgs, config, conf, constants, ... }:
+{ config, constants, ... }:
 
 {
   imports = [
@@ -16,19 +16,21 @@
   # Secretos
   age.secrets.admin-password.file = ../../secrets/users-admin_password.age;
   age.secrets.root-password.file = ../../secrets/users-root_password.age;
+  users = {
 
-  # Usuarios declarativos (contraseñas se actualizan en cada deploy)
-  users.mutableUsers = false;
+    # Usuarios declarativos (contraseñas se actualizan en cada deploy)
+    mutableUsers = false;
 
-  users.users.root = {
-    hashedPasswordFile = config.age.secrets.root-password.path;
-  };
+    users.root = {
+      hashedPasswordFile = config.age.secrets.root-password.path;
+    };
 
-  users.users.admin = {
-    isNormalUser = true;
-    extraGroups = [ "wheel" ];
-    hashedPasswordFile = config.age.secrets.admin-password.path;
-    openssh.authorizedKeys.keys = [ constants.admin.sshKey ];
+    users.admin = {
+      isNormalUser = true;
+      extraGroups = [ "wheel" ];
+      hashedPasswordFile = config.age.secrets.admin-password.path;
+      openssh.authorizedKeys.keys = [ constants.admin.sshKey ];
+    };
   };
 
   # Sudo sin contraseña para wheel

@@ -28,9 +28,9 @@ if [ -z "$IP" ]; then
     echo "Crea el nodo primero o proporciona la IP manualmente."
     exit 1
   fi
-  
+
   IP=$($JQ_BIN -r ".[\"$HOST\"].public_ip // empty" "$NODES_FILE")
-  
+
   if [ -z "$IP" ]; then
     echo "Error: No se encontró IP para '$HOST' en $NODES_FILE"
     echo ""
@@ -42,7 +42,7 @@ if [ -z "$IP" ]; then
     $JQ_BIN -r 'keys[]' "$NODES_FILE" 2>/dev/null || echo "  (ninguno)"
     exit 1
   fi
-  
+
   echo "IP obtenida de $NODES_FILE: $IP"
 fi
 
@@ -88,7 +88,7 @@ EXTRA_FILES=$(mktemp -d)
 trap "rm -rf $EXTRA_FILES" EXIT
 
 install -d -m700 "$EXTRA_FILES/etc/ssh"
-$AGE_BIN -d -i ~/.ssh/id_ed25519 "$AGE_FILE" > "$EXTRA_FILES/etc/ssh/ssh_host_ed25519_key"
+$AGE_BIN -d -i ~/.ssh/id_ed25519 "$AGE_FILE" >"$EXTRA_FILES/etc/ssh/ssh_host_ed25519_key"
 chmod 600 "$EXTRA_FILES/etc/ssh/ssh_host_ed25519_key"
 cp "$PUB_FILE" "$EXTRA_FILES/etc/ssh/ssh_host_ed25519_key.pub"
 chmod 644 "$EXTRA_FILES/etc/ssh/ssh_host_ed25519_key.pub"

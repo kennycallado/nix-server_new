@@ -1,14 +1,34 @@
 #!/usr/bin/env bash
 # Genera claves SSH y WireGuard para un host y las encripta con agenix
-# Uso: keygen.sh <host>
+# Uso: keygen.sh [--force] <host>
 # Variables esperadas: ADMIN_SSH_KEY, AGE_BIN, SSH_KEYGEN_BIN, AGENIX_BIN, SCRIPT_BIN, WG_BIN, JQ_BIN
+#
+# Si las claves ya existen:
+#   - Sin --force: sincroniza wireguard.json con las claves existentes (no regenera)
+#   - Con --force: regenera todas las claves
 
 set -e
-HOST="${1:-}"
+
+# Parse argumentos
+FORCE=false
+HOST=""
+for arg in "$@"; do
+  case $arg in
+  --force)
+    FORCE=true
+    ;;
+  *)
+    HOST="$arg"
+    ;;
+  esac
+done
 
 if [ -z "$HOST" ]; then
-  echo "Uso: nix run .#keygen -- <host>"
-  echo "Ejemplo: nix run .#keygen -- server_01"
+  echo "Uso: nix run .#keygen -- [--force] <host>"
+  echo "Ejemplo: nix run .#keygen -- server-01"
+  echo ""
+  echo "Opciones:"
+  echo "  --force   Regenerar claves aunque ya existan"
   exit 1
 fi
 
@@ -33,14 +53,56 @@ if [ ! -d "$STATE_DIR" ]; then
   exit 1
 fi
 
-if [ -f "$PUB_FILE" ]; then
-  echo "Ya existe clave SSH para $HOST en $PUB_FILE"
-  echo "Contenido: $(cat "$PUB_FILE")"
-  read -p "¿Regenerar claves SSH y WireGuard? [y/N] " -n 1 -r
-  echo
-  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    exit 0
+# =============================================================================
+# Verificar si las claves ya existen
+# =============================================================================
+SSH_EXISTS=false
+WG_EXISTS=false
+
+if [ -f "$PUB_FILE" ] && [ -f "$AGE_FILE" ]; then
+  SSH_EXISTS=true
+fi
+
+if [ -f "$WG_PUB_FILE" ] && [ -f "$WG_AGE_FILE" ]; then
+  WG_EXISTS=true
+fi
+
+# Si ambas claves existen y no es --force, solo sincronizar wireguard.json
+if [ "$SSH_EXISTS" = true ] && [ "$WG_EXISTS" = true ] && [ "$FORCE" = false ]; then
+  echo "Claves ya existen para $HOST (usa --force para regenerar)"
+  echo "  SSH: $PUB_FILE"
+  echo "  WireGuard: $WG_PUB_FILE"
+  echo ""
+  echo "Sincronizando wireguard.json con clave existente..."
+
+  WG_PUBLIC_KEY=$(cat "$WG_PUB_FILE")
+  TIMESTAMP=$(date -Iseconds)
+  TEMP_JSON=$(mktemp)
+
+  if [ -f "$WG_STATE_FILE" ]; then
+    $JQ_BIN --arg host "$HOST" \
+      --arg pubkey "$WG_PUBLIC_KEY" \
+      --arg timestamp "$TIMESTAMP" \
+      '.[$host] = { "public_key": $pubkey, "generated_at": $timestamp }' \
+      "$WG_STATE_FILE" >"$TEMP_JSON"
+  else
+    $JQ_BIN -n --arg host "$HOST" \
+      --arg pubkey "$WG_PUBLIC_KEY" \
+      --arg timestamp "$TIMESTAMP" \
+      '{ ($host): { "public_key": $pubkey, "generated_at": $timestamp } }' \
+      >"$TEMP_JSON"
   fi
+
+  mv "$TEMP_JSON" "$WG_STATE_FILE"
+  echo "wireguard.json actualizado para $HOST"
+  echo ""
+  echo "Clave pública WireGuard: $WG_PUBLIC_KEY"
+  exit 0
+fi
+
+# Si llegamos aquí, necesitamos generar claves (o --force fue especificado)
+if [ "$FORCE" = true ]; then
+  echo "Regenerando claves (--force especificado)..."
 fi
 
 # =============================================================================
@@ -70,8 +132,8 @@ TEMP_WG_KEY=$(mktemp)
 TEMP_WG_PUB=$(mktemp)
 
 # Generar clave privada y pública WireGuard
-$WG_BIN genkey > "$TEMP_WG_KEY"
-cat "$TEMP_WG_KEY" | $WG_BIN pubkey > "$TEMP_WG_PUB"
+$WG_BIN genkey >"$TEMP_WG_KEY"
+cat "$TEMP_WG_KEY" | $WG_BIN pubkey >"$TEMP_WG_PUB"
 
 WG_PUBLIC_KEY=$(cat "$TEMP_WG_PUB")
 
@@ -98,17 +160,17 @@ TEMP_JSON=$(mktemp)
 # Usar jq para actualizar el JSON de forma atómica
 if [ -f "$WG_STATE_FILE" ]; then
   $JQ_BIN --arg host "$HOST" \
-          --arg pubkey "$WG_PUBLIC_KEY" \
-          --arg timestamp "$TIMESTAMP" \
-          '.[$host] = { "public_key": $pubkey, "generated_at": $timestamp }' \
-          "$WG_STATE_FILE" > "$TEMP_JSON"
+    --arg pubkey "$WG_PUBLIC_KEY" \
+    --arg timestamp "$TIMESTAMP" \
+    '.[$host] = { "public_key": $pubkey, "generated_at": $timestamp }' \
+    "$WG_STATE_FILE" >"$TEMP_JSON"
 else
   # Crear nuevo archivo si no existe
   $JQ_BIN -n --arg host "$HOST" \
-             --arg pubkey "$WG_PUBLIC_KEY" \
-             --arg timestamp "$TIMESTAMP" \
-             '{ ($host): { "public_key": $pubkey, "generated_at": $timestamp } }' \
-             > "$TEMP_JSON"
+    --arg pubkey "$WG_PUBLIC_KEY" \
+    --arg timestamp "$TIMESTAMP" \
+    '{ ($host): { "public_key": $pubkey, "generated_at": $timestamp } }' \
+    >"$TEMP_JSON"
 fi
 
 mv "$TEMP_JSON" "$WG_STATE_FILE"

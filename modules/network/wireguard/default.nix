@@ -1,29 +1,35 @@
 { config, lib, conf, hosts, ... }:
 let
-  hostname = conf.hostname;
-  thisNode = hosts.nodes.${hostname};
-  otherNodes = lib.filterAttrs (name: _: name != hostname) hosts.nodes;
-
-  # Encuentra el servidor WireGuard
-  serverNode = lib.findFirst
-    (node: node.wg.isServer)
-    (throw "No WireGuard server defined in hosts.nix")
-    (lib.attrValues hosts.nodes);
-
-  serverName = lib.findFirst
-    (name: hosts.nodes.${name}.wg.isServer)
-    (throw "No WireGuard server defined in hosts.nix")
-    (lib.attrNames hosts.nodes);
-
-  isServer = thisNode.wg.isServer;
+  inherit (conf) hostname;
   enabled = conf.wireguard.enable or false;
+
+  # Solo buscar este nodo si está en hosts.nodes (provisionado)
+  nodeExists = hosts.nodes ? ${hostname};
+  thisNode = if nodeExists then hosts.nodes.${hostname} else null;
+  otherNodes = if nodeExists then lib.filterAttrs (name: _: name != hostname) hosts.nodes else { };
+
+  # Encuentra el servidor WireGuard (solo si hay nodos)
+  hasNodes = hosts.nodes != { };
+  serverNode =
+    if hasNodes then lib.findFirst (node: node.wg.isServer) null (lib.attrValues hosts.nodes) else null;
+
+  serverName =
+    if hasNodes then
+      lib.findFirst (name: hosts.nodes.${name}.wg.isServer) null (lib.attrNames hosts.nodes)
+    else
+      null;
+
+  isServer = if thisNode != null then thisNode.wg.isServer else false;
+
+  # Solo habilitar si el nodo existe en hosts (provisionado) y wireguard enabled
+  actuallyEnabled = enabled && nodeExists;
 in
 {
-  imports = [
+  imports = lib.optionals (actuallyEnabled && thisNode != null) [
     (if isServer then ./server.nix else ./peer.nix)
   ];
 
-  config = lib.mkIf enabled {
+  config = lib.mkIf actuallyEnabled {
     # Secreto: clave privada WireGuard
     age.secrets.wireguard-private = {
       file = ../../../secrets/wireguard-${hostname}.age;
@@ -31,11 +37,7 @@ in
     };
 
     # /etc/hosts con IPs de WireGuard para resolver nombres
-    networking.hosts = lib.mapAttrs'
-      (name: node:
-        lib.nameValuePair node.ip.wg [ name ]
-      )
-      hosts.nodes;
+    networking.hosts = lib.mapAttrs' (name: node: lib.nameValuePair node.ip.wg [ name ]) hosts.nodes;
 
     # Interfaz WireGuard
     networking.wireguard.interfaces.wg0 = {
@@ -56,6 +58,6 @@ in
     _serverNode = lib.mkOption { default = serverNode; };
     _serverName = lib.mkOption { default = serverName; };
     _isServer = lib.mkOption { default = isServer; };
-    _enabled = lib.mkOption { default = enabled; };
+    _enabled = lib.mkOption { default = actuallyEnabled; };
   };
 }

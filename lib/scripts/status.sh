@@ -25,8 +25,8 @@ NODES_FILE="$FLAKE_ROOT/hosts/state/nodes.json"
 
 # Check if nodes.json exists
 if [[ ! -f "$NODES_FILE" ]]; then
-    echo -e "${RED}Error: $NODES_FILE not found${NC}" >&2
-    exit 1
+  echo -e "${RED}Error: $NODES_FILE not found${NC}" >&2
+  exit 1
 fi
 
 # Read local state
@@ -37,11 +37,11 @@ HCLOUD_AVAILABLE=false
 HETZNER_SERVERS="{}"
 
 if [[ -n "${HCLOUD_TOKEN:-}" ]]; then
-    # Try to get Hetzner servers
-    if HETZNER_RAW=$($HCLOUD_BIN server list -o json 2>/dev/null); then
-        HCLOUD_AVAILABLE=true
-        # Transform hcloud output to a map by name
-        HETZNER_SERVERS=$(echo "$HETZNER_RAW" | $JQ_BIN '
+  # Try to get Hetzner servers
+  if HETZNER_RAW=$($HCLOUD_BIN server list -o json 2>/dev/null); then
+    HCLOUD_AVAILABLE=true
+    # Transform hcloud output to a map by name
+    HETZNER_SERVERS=$(echo "$HETZNER_RAW" | $JQ_BIN '
             map({
                 (.name): {
                     id: .id,
@@ -52,11 +52,11 @@ if [[ -n "${HCLOUD_TOKEN:-}" ]]; then
                 }
             }) | add // {}
         ')
-    else
-        echo -e "${YELLOW}Warning: Failed to query Hetzner API${NC}" >&2
-    fi
+  else
+    echo -e "${YELLOW}Warning: Failed to query Hetzner API${NC}" >&2
+  fi
 else
-    echo -e "${YELLOW}Warning: HCLOUD_TOKEN not set, skipping Hetzner queries${NC}" >&2
+  echo -e "${YELLOW}Warning: HCLOUD_TOKEN not set, skipping Hetzner queries${NC}" >&2
 fi
 
 # Get all node names (local + remote)
@@ -66,11 +66,11 @@ ALL_NODES=$(echo "$LOCAL_STATE" "$HETZNER_SERVERS" | $JQ_BIN -s '
 
 # Build the final status object
 RESULT=$($JQ_BIN -n \
-    --argjson local "$LOCAL_STATE" \
-    --argjson remote "$HETZNER_SERVERS" \
-    --argjson nodes "$ALL_NODES" \
-    --argjson hcloud_available "$HCLOUD_AVAILABLE" \
-    '
+  --argjson local "$LOCAL_STATE" \
+  --argjson remote "$HETZNER_SERVERS" \
+  --argjson nodes "$ALL_NODES" \
+  --argjson hcloud_available "$HCLOUD_AVAILABLE" \
+  '
     $nodes | map(. as $name |
         {
             ($name): {

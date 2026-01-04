@@ -5,7 +5,7 @@ let
   # Peers de nodos del cluster
   nodePeers = lib.mapAttrsToList
     (name: node: {
-      publicKey = node.wg.publicKey;
+      inherit (node.wg) publicKey;
       allowedIPs = [ "${node.ip.wg}/32" ];
       persistentKeepalive = 25;
     })
@@ -14,7 +14,7 @@ let
   # Peers de clientes externos
   clientPeers = lib.mapAttrsToList
     (name: client: {
-      publicKey = client.wg.publicKey;
+      inherit (client.wg) publicKey;
       allowedIPs = [ "${client.ip.wg}/32" ];
       persistentKeepalive = 25;
     })

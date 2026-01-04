@@ -1,7 +1,9 @@
 # Configuración de hardware para servidores x86_64
-{ config, lib, pkgs, modulesPath, ... }:
+{ config, lib, modulesPath, ... }:
+
 {
   imports = [
+    (modulesPath + "/installer/scan/not-detected.nix")
     (modulesPath + "/profiles/qemu-guest.nix")
   ];
 
@@ -13,14 +15,7 @@
       efiInstallAsRemovable = true;
     };
 
-    initrd.availableKernelModules = [
-      "ahci"
-      "xhci_pci"
-      "virtio_pci"
-      "virtio_scsi"
-      "sd_mod"
-      "sr_mod"
-    ];
+    initrd.availableKernelModules = [ "ahci" "xhci_pci" "virtio_pci" "virtio_scsi" "sd_mod" "sr_mod" ];
 
     kernelModules = [ "kvm-intel" "kvm-amd" ];
   };

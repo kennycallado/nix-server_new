@@ -10,21 +10,26 @@ Infraestructura del servidor Webslab gestionada con **NixOS**, **k3s** y **WireG
 
 ## 🚀 Bootstrap (Instalación Inicial)
 
-Para añadir un nuevo nodo (ej: `agent_03`):
+### Opción A: Provisión Automatizada (Hetzner)
+
+```bash
+# 1. Crear hosts/nodes/agent_03/config.nix con infra.provider = "hetzner"
+# 2. Provisionar (crea servidor, genera claves, instala NixOS)
+HCLOUD_TOKEN=xxx nix run .#provision -- agent_03
+```
+
+### Opción B: Manual (cualquier proveedor)
 
 1.  **Configuración**: Crear `hosts/nodes/agent_03/config.nix`.
 2.  **Generar Claves**:
     ```bash
     nix run .#keygen -- agent_03
     ```
-3.  **Registrar Clave Pública**:
-    - Copiar clave pública generada en `secrets/hosts/agent_03.pub`.
-    - Añadirla a `secrets/secrets.nix`.
-4.  **Actualizar Secretos**:
+3.  **Actualizar Secretos**:
     ```bash
     nix run .#rekey
     ```
-5.  **Instalar NixOS**:
+4.  **Instalar NixOS**:
     ```bash
     nix run .#install -- agent_03 <IP_PUBLICA>
     ```
@@ -39,6 +44,20 @@ deploy .#server_01
 
 # Todo el cluster
 deploy
+```
+
+## 🔍 Estado del Cluster
+
+```bash
+# Ver estado local vs Hetzner (requiere HCLOUD_TOKEN para Hetzner)
+nix run .#status
+```
+
+## 🗑️ Destrucción de Nodos
+
+```bash
+# Destruir servidor en Hetzner y limpiar estado local
+HCLOUD_TOKEN=xxx nix run .#destroy -- agent_03
 ```
 
 ## 🔐 Gestión de Secretos
