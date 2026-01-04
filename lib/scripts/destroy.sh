@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # destroy.sh - Destroy a node and clean up local state
-# Usage: nix run .#destroy -- <hostname>
+# Usage: nix run .#destroy -- [--force] <hostname>
 #
 # Required env vars (injected by apps.nix):
 #   HCLOUD_BIN - path to hcloud binary
@@ -8,6 +8,9 @@
 #
 # Optional env vars:
 #   SKIP_GIT_COMMIT=1  - Don't commit state changes (useful for testing)
+#
+# Options:
+#   --force  - Skip k3s server protection (DANGEROUS: may break cluster)
 
 set -euo pipefail
 
@@ -18,25 +21,43 @@ YELLOW='\033[0;33m'
 NC='\033[0m' # No Color
 
 # Paths
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FLAKE_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-NODES_FILE="$FLAKE_ROOT/hosts/state/nodes.json"
-WIREGUARD_FILE="$FLAKE_ROOT/hosts/state/wireguard.json"
+PROJECT_ROOT="$(pwd)"
+NODES_FILE="$PROJECT_ROOT/hosts/state/nodes.json"
+WIREGUARD_FILE="$PROJECT_ROOT/hosts/state/wireguard.json"
 
 # Check required binaries
 : "${HCLOUD_BIN:?HCLOUD_BIN not set}"
 : "${JQ_BIN:?JQ_BIN not set}"
 
 # ------------------------------------------------------------------------------
-# Validate arguments
+# Parse arguments
 # ------------------------------------------------------------------------------
-if [[ $# -lt 1 ]]; then
+FORCE=false
+HOSTNAME=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --force|-f)
+      FORCE=true
+      shift
+      ;;
+    -*)
+      echo -e "${RED}Error: Unknown option $1${NC}" >&2
+      echo "Usage: nix run .#destroy -- [--force] <hostname>" >&2
+      exit 1
+      ;;
+    *)
+      HOSTNAME="$1"
+      shift
+      ;;
+  esac
+done
+
+if [[ -z "$HOSTNAME" ]]; then
   echo -e "${RED}Error: Missing hostname argument${NC}" >&2
-  echo "Usage: nix run .#destroy -- <hostname>" >&2
+  echo "Usage: nix run .#destroy -- [--force] <hostname>" >&2
   exit 1
 fi
-
-HOSTNAME="$1"
 
 # ------------------------------------------------------------------------------
 # Read node state
@@ -62,22 +83,30 @@ PROVIDER_ID=$(echo "$NODE_DATA" | $JQ_BIN -r '.provider_id // empty')
 PUBLIC_IP=$(echo "$NODE_DATA" | $JQ_BIN -r '.public_ip // "unknown"')
 
 # ------------------------------------------------------------------------------
-# Check k3s role - abort if server
+# Check k3s role - abort if server (unless --force)
 # ------------------------------------------------------------------------------
-CONFIG_FILE="$FLAKE_ROOT/hosts/nodes/$HOSTNAME/config.nix"
+CONFIG_FILE="$PROJECT_ROOT/hosts/nodes/$HOSTNAME/config.nix"
 if [[ -f "$CONFIG_FILE" ]]; then
   # Parse k3s.role from Nix config (simple grep approach)
   if grep -q 'k3s\.role.*=.*"server"' "$CONFIG_FILE" 2>/dev/null ||
     grep -q "k3s\.role.*=.*'server'" "$CONFIG_FILE" 2>/dev/null ||
     (grep -A5 'k3s\s*=' "$CONFIG_FILE" 2>/dev/null | grep -q 'role\s*=\s*"server"'); then
-    echo -e "${RED}ERROR: Cannot destroy k3s server node '$HOSTNAME'${NC}" >&2
-    echo "" >&2
-    echo "First drain the node and remove from cluster:" >&2
-    echo "  kubectl drain $HOSTNAME --ignore-daemonsets --delete-emptydir-data" >&2
-    echo "  kubectl delete node $HOSTNAME" >&2
-    echo "" >&2
-    echo "Then re-run this command." >&2
-    exit 1
+    if [[ "$FORCE" == "true" ]]; then
+      echo -e "${YELLOW}WARNING: Destroying k3s server node (--force used)${NC}" >&2
+    else
+      echo -e "${RED}ERROR: Cannot destroy k3s server node '$HOSTNAME'${NC}" >&2
+      echo "" >&2
+      echo "This node is a k3s server. Destroying it may break the cluster." >&2
+      echo "" >&2
+      echo "Options:" >&2
+      echo "  1. Use --force to skip this check (DANGEROUS)" >&2
+      echo "     nix run .#destroy -- --force $HOSTNAME" >&2
+      echo "" >&2
+      echo "  2. First drain and remove from cluster:" >&2
+      echo "     kubectl drain $HOSTNAME --ignore-daemonsets --delete-emptydir-data" >&2
+      echo "     kubectl delete node $HOSTNAME" >&2
+      exit 1
+    fi
   fi
 fi
 
@@ -170,7 +199,7 @@ if [[ "${SKIP_GIT_COMMIT:-}" == "1" ]]; then
 else
   echo "Committing state changes..."
 
-  cd "$FLAKE_ROOT"
+  cd "$PROJECT_ROOT"
   git add hosts/state/
   if git diff --cached --quiet hosts/state/; then
     echo -e "${YELLOW}No changes to commit${NC}"

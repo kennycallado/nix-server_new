@@ -8,8 +8,9 @@
 #     root = ./.;
 #     hosts = import ./modules/network/hosts.nix;
 #   };
-#   # node.nixosConfig - NixOS system configuration
-#   # node.deployNode  - deploy-rs node configuration
+#   # node.nixosConfig        - NixOS system configuration (full)
+#   # node.nixosConfigMinimal - NixOS minimal configuration (bootstrap)
+#   # node.deployNode         - deploy-rs node configuration
 #
 # Arguments:
 #   nixpkgs   - nixpkgs input
@@ -55,29 +56,52 @@ let
 
   # Conditional modules based on config flags
   conditionalModules =
-    (if conf.nfs.enable or false then [ (configDir + "/../../../modules/services/nfs.nix") ] else [ ]);
+    if conf.nfs.enable or false then [ (configDir + "/../../../modules/services/nfs.nix") ] else [ ];
 
-  # All modules combined
+  # All modules combined (full configuration)
   allModules = baseModules ++ conditionalModules;
 
-  # Build NixOS configuration
+  # Minimal modules for bootstrap (Phase 1)
+  # Only: disko + hardware + bootstrap minimal
+  minimalModules = [
+    disko.nixosModules.disko
+    (import (configDir + "/../../hardware/disko.nix") { device = conf.disk; })
+    hardwareModule
+    (configDir + "/../../../modules/bootstrap/minimal.nix")
+
+    # Inherit network identity from node config
+    {
+      networking.hostName = conf.hostname;
+    }
+  ];
+
+  # Build NixOS configuration (full)
   nixosConfig = nixpkgs.lib.nixosSystem {
-    system = conf.system;
+    inherit (conf) system;
     specialArgs = {
       inherit conf hosts constants;
     };
     modules = allModules;
   };
 
+  # Build NixOS configuration (minimal for bootstrap)
+  nixosConfigMinimal = nixpkgs.lib.nixosSystem {
+    inherit (conf) system;
+    specialArgs = {
+      inherit conf;
+    };
+    modules = minimalModules;
+  };
+
   # Build deploy-rs packages
   deployPkgs = import nixpkgs {
-    system = conf.system;
+    inherit (conf) system;
     overlays = [ deploy-rs.overlays.default ];
   };
 
 in
 {
-  inherit nixosConfig;
+  inherit nixosConfig nixosConfigMinimal;
 
   deployNode = {
     hostname = conf.deploy.ip;
@@ -88,7 +112,7 @@ in
     remoteBuild = conf.deploy.remoteBuild or true;
 
     profiles.system = {
-      sshUser = conf.deploy.sshUser;
+      inherit (conf.deploy) sshUser;
       user = "root";
       path = deployPkgs.deploy-rs.lib.activate.nixos nixosConfig;
     };

@@ -15,9 +15,8 @@ YELLOW='\033[0;33m'
 NC='\033[0m' # No Color
 
 # Paths
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FLAKE_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-NODES_FILE="$FLAKE_ROOT/hosts/state/nodes.json"
+PROJECT_ROOT="$(pwd)"
+NODES_FILE="$PROJECT_ROOT/hosts/state/nodes.json"
 
 # Check required binaries
 : "${HCLOUD_BIN:?HCLOUD_BIN not set}"

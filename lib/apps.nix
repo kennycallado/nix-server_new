@@ -54,6 +54,24 @@ in
     meta.description = "Install NixOS on a remote host";
   };
 
+  install-minimal = {
+    type = "app";
+    program = toString (wrapScript "install-minimal" ./scripts/install-minimal.sh [
+      "AGE_BIN='${pkgs.age}/bin/age'"
+      "NIXOS_ANYWHERE_BIN='${nixos-anywhere-pkg}/bin/nixos-anywhere'"
+      "JQ_BIN='${pkgs.jq}/bin/jq'"
+    ]);
+    meta.description = "Install minimal NixOS for bootstrap (Phase 1)";
+  };
+
+  deploy = {
+    type = "app";
+    program = toString (wrapScript "deploy" ./scripts/deploy.sh [
+      "JQ_BIN='${pkgs.jq}/bin/jq'"
+    ]);
+    meta.description = "Deploy configuration with remote build (Phase 2)";
+  };
+
   provision = {
     type = "app";
     program = toString (wrapScript "provision" ./scripts/provision.sh [

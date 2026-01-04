@@ -5,9 +5,11 @@
     nixpkgs.url = "github:nixos/nixpkgs/nixos-25.11";
     systems.url = "github:nix-systems/default";
 
-    agenix.url = "github:ryantm/agenix";
-    agenix.inputs.darwin.follows = "";
-    agenix.inputs.nixpkgs.follows = "nixpkgs";
+    agenix = {
+        url = "github:ryantm/agenix";
+        inputs.darwin.follows = "";
+        inputs.nixpkgs.follows = "nixpkgs";
+    };
 
     deploy-rs.url = "github:serokell/deploy-rs";
     deploy-rs.inputs.nixpkgs.follows = "nixpkgs";
@@ -19,7 +21,7 @@
     nixos-anywhere.inputs.nixpkgs.follows = "nixpkgs";
   };
 
-  outputs = inputs@{ self, nixpkgs, systems, disko, agenix, deploy-rs, nixos-anywhere, ... }:
+  outputs = { self, nixpkgs, systems, disko, agenix, deploy-rs, nixos-anywhere, ... }:
     let
       eachSystem = nixpkgs.lib.genAttrs (import systems);
 
@@ -44,7 +46,15 @@
       );
     in
     {
-      nixosConfigurations = nixpkgs.lib.mapAttrs (_: node: node.nixosConfig) nodes;
+      # Full NixOS configurations
+      nixosConfigurations = nixpkgs.lib.mapAttrs (_: node: node.nixosConfig) nodes
+        # Minimal configurations for bootstrap (Phase 1)
+        // nixpkgs.lib.mapAttrs'
+        (name: node:
+          nixpkgs.lib.nameValuePair "${name}-minimal" node.nixosConfigMinimal
+        )
+        nodes;
+
       deploy.nodes = nixpkgs.lib.mapAttrs (_: node: node.deployNode) nodes;
 
       devShells = eachSystem (system:
@@ -63,10 +73,10 @@
 
       checks = eachSystem (system:
         import ./lib/checks.nix {
-          pkgs = nixpkgs.legacyPackages.${system};
-          lib = nixpkgs.lib;
-          root = ./.;
           inherit system self deploy-rs;
+          inherit (nixpkgs) lib;
+          pkgs = nixpkgs.legacyPackages.${system};
+          root = ./.;
         }
       );
 
