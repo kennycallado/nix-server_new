@@ -14,8 +14,11 @@
   values = {
     nfs.server = nfsServerIp;
     nfs.path = "/srv/nfs";
-    storageClass.name = "nfs";
-    storageClass.defaultClass = true;
+    storageClass = {
+      name = "nfs";
+      defaultClass = true;
+      reclaimPolicy = "Retain";
+    };
     nodeSelector."node-role.kubernetes.io/control-plane" = "true";
     tolerations = serverToleration;
   };
