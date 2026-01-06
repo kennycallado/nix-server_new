@@ -24,11 +24,13 @@ show_usage() {
   echo -e "  ${GREEN}all${NC}         Todos los servicios (default)"
   echo -e "  ${GREEN}argocd${NC}      Solo ArgoCD UI (puerto 8080)"
   echo -e "  ${GREEN}windmill${NC}    Solo Windmill UI (puerto 8000)"
+  echo -e "  ${GREEN}grafana${NC}     Solo Grafana UI (puerto 3000)"
   echo -e "  ${GREEN}garage${NC}      Solo Garage WebUI (puerto 32009)"
   echo ""
   echo -e "${CYAN}Ejemplos:${NC}"
   echo "  nix run .#tunnel                    # Todos los servicios"
   echo "  nix run .#tunnel -- argocd          # Solo ArgoCD"
+  echo "  nix run .#tunnel -- grafana         # Solo Grafana"
   echo ""
 }
 
@@ -55,6 +57,10 @@ get_credentials() {
   WINDMILL_USER=$(ssh "${SSH_USER}@${SERVER_IP}" "sudo kubectl -n windmill get secret windmill-superadmin -o jsonpath='{.data.email}' 2>/dev/null | base64 -d" 2>/dev/null || echo "admin@windmill.dev")
   WINDMILL_PASS=$(ssh "${SSH_USER}@${SERVER_IP}" "sudo kubectl -n windmill get secret windmill-superadmin -o jsonpath='{.data.password}' 2>/dev/null | base64 -d" 2>/dev/null || echo "changeme")
 
+  # Grafana (from SealedSecret grafana-admin)
+  GRAFANA_USER=$(ssh "${SSH_USER}@${SERVER_IP}" "sudo kubectl -n metrics get secret grafana-admin -o jsonpath='{.data.admin-user}' 2>/dev/null | base64 -d" 2>/dev/null || echo "admin")
+  GRAFANA_PASS=$(ssh "${SSH_USER}@${SERVER_IP}" "sudo kubectl -n metrics get secret grafana-admin -o jsonpath='{.data.admin-password}' 2>/dev/null | base64 -d" 2>/dev/null || echo "N/A")
+
   # Garage WebUI (del SealedSecret, formato user:bcrypt_hash - solo mostramos el user)
   GARAGE_AUTH=$(ssh "${SSH_USER}@${SERVER_IP}" "sudo kubectl -n garage get secret garage-webui-auth -o jsonpath='{.data.AUTH_USER_PASS}' 2>/dev/null | base64 -d" 2>/dev/null || echo "N/A")
   GARAGE_USER=$(echo "$GARAGE_AUTH" | cut -d: -f1 2>/dev/null || echo "N/A")
@@ -78,6 +84,10 @@ print_credentials() {
   echo -e "  ${GREEN}Windmill${NC}      http://localhost:8000"
   echo -e "                User: ${WINDMILL_USER}"
   echo -e "                Pass: ${WINDMILL_PASS}"
+  echo ""
+  echo -e "  ${GREEN}Grafana${NC}       http://localhost:3000"
+  echo -e "                User: ${GRAFANA_USER}"
+  echo -e "                Pass: ${GRAFANA_PASS}"
   echo ""
   echo -e "  ${GREEN}Garage WebUI${NC}  http://localhost:32009"
   echo -e "                User: ${GARAGE_USER}"
@@ -105,6 +115,7 @@ tunnel_all() {
   # Iniciar port-forwards en el servidor remoto
   ssh "${SSH_USER}@${SERVER_IP}" "sudo kubectl port-forward -n argocd svc/argocd-server 18080:80 --address 127.0.0.1 >/dev/null 2>&1" &
   ssh "${SSH_USER}@${SERVER_IP}" "sudo kubectl port-forward -n windmill svc/windmill-app 18000:8000 --address 127.0.0.1 >/dev/null 2>&1" &
+  ssh "${SSH_USER}@${SERVER_IP}" "sudo kubectl port-forward -n metrics svc/kube-prometheus-stack-grafana 13000:80 --address 127.0.0.1 >/dev/null 2>&1" &
   
   sleep 2
 
@@ -112,6 +123,7 @@ tunnel_all() {
   ssh -N \
     -L 8080:localhost:18080 \
     -L 8000:localhost:18000 \
+    -L 3000:localhost:13000 \
     -L 32009:localhost:32009 \
     "${SSH_USER}@${SERVER_IP}"
 }
@@ -174,6 +186,26 @@ tunnel_garage() {
   ssh -N -L 32009:localhost:32009 "${SSH_USER}@${SERVER_IP}"
 }
 
+# Túnel solo para Grafana
+tunnel_grafana() {
+  echo -e "${BLUE}Conectando a ${SSH_USER}@${SERVER_IP}...${NC}"
+  echo ""
+  
+  GRAFANA_USER=$(ssh "${SSH_USER}@${SERVER_IP}" "sudo kubectl -n metrics get secret grafana-admin -o jsonpath='{.data.admin-user}' 2>/dev/null | base64 -d" 2>/dev/null || echo "admin")
+  GRAFANA_PASS=$(ssh "${SSH_USER}@${SERVER_IP}" "sudo kubectl -n metrics get secret grafana-admin -o jsonpath='{.data.admin-password}' 2>/dev/null | base64 -d" 2>/dev/null || echo "N/A")
+  
+  echo -e "  ${GREEN}Grafana${NC}  http://localhost:3000"
+  echo -e "           User: ${GRAFANA_USER}"
+  echo -e "           Pass: ${GRAFANA_PASS}"
+  echo ""
+  echo -e "${YELLOW}Presiona Ctrl+C para cerrar${NC}"
+  echo ""
+
+  ssh "${SSH_USER}@${SERVER_IP}" "sudo kubectl port-forward -n metrics svc/kube-prometheus-stack-grafana 13000:80 --address 127.0.0.1 >/dev/null 2>&1" &
+  sleep 2
+  ssh -N -L 3000:localhost:13000 "${SSH_USER}@${SERVER_IP}"
+}
+
 # Main
 SERVICE="${1:-all}"
 
@@ -186,6 +218,9 @@ case "$SERVICE" in
     ;;
   windmill)
     tunnel_windmill
+    ;;
+  grafana)
+    tunnel_grafana
     ;;
   garage)
     tunnel_garage
