@@ -5,6 +5,9 @@ let
   root = ../../.;
   nodesDir = root + "/hosts/nodes";
 
+  # Import centralized constants for wgClients
+  constants = import ../../lib/constants.nix;
+
   # Use lib/discover.nix to discover nodes
   discover = import ../../lib/discover.nix;
   nodeNames = discover nodesDir;
@@ -100,13 +103,11 @@ in
 
   inherit nodes;
 
-  # External clients (no config.nix, manually defined)
-  clients = {
-    ryzen = {
-      ip.wg = "10.100.10.100";
-      wg.publicKey = "QUAsyA1ieF4GavRU0l+E+Z1i+x/TIgJ3frZLg9bh0UY=";
-    };
-  };
+  # External clients from constants (no config.nix, manually defined)
+  clients = builtins.mapAttrs (name: client: {
+    ip.wg = client.ip;
+    wg.publicKey = client.publicKey;
+  }) constants.wgClients;
 
   # Dynamic server resolvers
   inherit findWgServer findNfsServer;
