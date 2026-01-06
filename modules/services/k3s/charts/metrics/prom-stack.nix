@@ -37,6 +37,10 @@ in
           limits = { cpu = "1000m"; memory = "2Gi"; };
         };
 
+        # Enable remote write receiver for OTEL Collector spanmetrics
+        # Accepts writes at: http://prometheus:9090/api/v1/write
+        enableRemoteWriteReceiver = true;
+
         # Storage & Retention (from constants)
         retention = metricsConfig.retention;
         storageSpec.volumeClaimTemplate = {

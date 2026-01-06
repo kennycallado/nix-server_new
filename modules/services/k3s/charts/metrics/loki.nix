@@ -46,6 +46,12 @@
         replication_factor = 1;
       };
 
+      # Enable OTLP ingestion for OpenTelemetry Collector
+      # Accepts logs at: http://loki:3100/otlp/v1/logs
+      otlp = {
+        enabled = true;
+      };
+
       # Schema config
       schemaConfig = {
         configs = [
