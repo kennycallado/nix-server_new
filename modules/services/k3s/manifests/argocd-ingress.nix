@@ -5,9 +5,11 @@
 # - IngressRoute allows explicit scheme control for backend connections
 # - Supports gRPC (h2c) for ArgoCD CLI access
 #
-{ pkgs, lib ? pkgs.lib }:
+{ pkgs, lib ? pkgs.lib, domain }:
 
 let
+  argocdHost = "argocd.${domain}";
+
   # IngressRoute for ArgoCD web UI and API
   ingressRoute = ''
     apiVersion: traefik.io/v1alpha1
@@ -24,7 +26,7 @@ let
       routes:
         # HTTP/HTTPS traffic (web UI and REST API)
         - kind: Rule
-          match: Host(`argocd.kennycallado.dev`)
+          match: Host(`${argocdHost}`)
           priority: 10
           services:
             - name: argocd-server
@@ -32,7 +34,7 @@ let
               scheme: http
         # gRPC traffic (ArgoCD CLI)
         - kind: Rule
-          match: Host(`argocd.kennycallado.dev`) && Header(`Content-Type`, `application/grpc`)
+          match: Host(`${argocdHost}`) && Header(`Content-Type`, `application/grpc`)
           priority: 11
           services:
             - name: argocd-server
@@ -55,7 +57,7 @@ let
         name: letsencrypt-prod
         kind: ClusterIssuer
       dnsNames:
-        - argocd.kennycallado.dev
+        - ${argocdHost}
   '';
 
   manifest = lib.concatStringsSep "\n---\n" [

@@ -1,6 +1,8 @@
-{ serverToleration, exposeServices }:
+{ serverToleration, exposeServices, domain }:
 
 let
+  windmillHost = "windmill.${domain}";
+
   # InitContainer que espera a que PostgreSQL esté disponible
   waitForPostgres = {
     name = "wait-for-postgres";
@@ -39,7 +41,7 @@ in
 
     # Configuración principal de Windmill
     windmill = {
-      baseDomain = "windmill.kennycallado.dev";
+      baseDomain = windmillHost;
       baseProtocol = "https";
       appReplicas = 1;
       lspReplicas = 1;
@@ -57,7 +59,7 @@ in
           requests = { cpu = "100m"; memory = "256Mi"; };
           limits = { cpu = "500m"; memory = "512Mi"; };
         };
-        # Superadmin credentials from SealedSecret
+        # Superadmin credentials from SealedSecret + Metrics
         extraEnv = [
           {
             name = "SUPERADMIN_INITIAL_EMAIL";
@@ -73,6 +75,8 @@ in
               key = "password";
             };
           }
+          # Enable Prometheus metrics endpoint on port 8001
+          { name = "METRICS_ADDR"; value = "0.0.0.0:8001"; }
         ];
       };
 
@@ -130,11 +134,21 @@ in
         "traefik.ingress.kubernetes.io/router.tls" = "true";
       };
       tls = [{
-        hosts = [ "windmill.kennycallado.dev" ];
+        hosts = [ windmillHost ];
         secretName = "windmill-tls";
       }];
     } else {
       enabled = false;
+    };
+
+    # ===== Metrics for Prometheus =====
+    # Windmill exposes /metrics on port 8001
+    serviceMonitor = {
+      enabled = true;
+      namespace = "windmill";
+      labels = { };
+      interval = "30s";
+      scrapeTimeout = "10s";
     };
   };
 }

@@ -1,9 +1,15 @@
-{ config, lib, pkgs, conf, hosts, ... }:
+{ config, lib, pkgs, conf, hosts, constants, ... }:
 let
   cfg = conf.k3s or { };
   isServer = cfg.role or "agent" == "server";
   isFirstServer = cfg.serverAddr or "" == "";
   exposeServices = cfg.exposeServices or false; # Whether to expose services via public ingress
+
+  # Domain configuration from constants (e.g., "kennycallado.dev", "staging.example.com")
+  domain = constants.domain;
+  adminEmail = constants.admin.email;
+  metricsConfig = constants.metrics;
+  backupsConfig = constants.backups;
 
   serverToleration = [{
     key = "node-role.kubernetes.io/control-plane";
@@ -47,12 +53,12 @@ let
   };
 
   # Helm charts (autoDeployCharts)
-  charts = import ./charts { inherit serverToleration nfsServerIp exposeServices; };
+  charts = import ./charts { inherit serverToleration nfsServerIp exposeServices domain metricsConfig; };
 
   # Raw manifests (desplegados via k3s auto-deploy)
   manifests = {
     cnpg-cluster = import ./manifests/cnpg-cluster.nix {
-      inherit serverToleration pkgs lib;
+      inherit serverToleration pkgs lib backupsConfig;
     };
     # windmill-secret ahora es un SealedSecret (sealedsecrets/windmill.yaml)
     garage = import ./manifests/garage.nix {
@@ -62,9 +68,12 @@ let
       inherit pkgs lib garageWebuiConfig;
     };
     cluster-issuer = import ./manifests/cluster-issuer.nix {
-      inherit pkgs lib;
+      inherit pkgs lib adminEmail;
     };
     argocd-ingress = import ./manifests/argocd-ingress.nix {
+      inherit pkgs lib domain;
+    };
+    windmill-servicemonitor = import ./manifests/windmill-servicemonitor.nix {
       inherit pkgs lib;
     };
   };
@@ -131,11 +140,13 @@ in
     "L+ /var/lib/rancher/k3s/server/manifests/garage.yaml - - - - ${manifests.garage}"
     "L+ /var/lib/rancher/k3s/server/manifests/garage-webui.yaml - - - - ${manifests.garage-webui}"
     "L+ /var/lib/rancher/k3s/server/manifests/cluster-issuer.yaml - - - - ${manifests.cluster-issuer}"
+    "L+ /var/lib/rancher/k3s/server/manifests/windmill-servicemonitor.yaml - - - - ${manifests.windmill-servicemonitor}"
     # SealedSecrets - se desencriptan automáticamente por el controller
     "L+ /var/lib/rancher/k3s/server/manifests/garage-sealed.yaml - - - - ${./sealedsecrets/garage.yaml}"
     "L+ /var/lib/rancher/k3s/server/manifests/postgres-sealed.yaml - - - - ${./sealedsecrets/postgres.yaml}"
     "L+ /var/lib/rancher/k3s/server/manifests/windmill-sealed.yaml - - - - ${./sealedsecrets/windmill.yaml}"
     "L+ /var/lib/rancher/k3s/server/manifests/windmill-superadmin-sealed.yaml - - - - ${./sealedsecrets/windmill-superadmin.yaml}"
+    "L+ /var/lib/rancher/k3s/server/manifests/grafana-admin-sealed.yaml - - - - ${./sealedsecrets/grafana-admin.yaml}"
   ] ++ lib.optionals exposeServices [
     # Public ingress for ArgoCD (only when exposeServices is true)
     "L+ /var/lib/rancher/k3s/server/manifests/argocd-ingress.yaml - - - - ${manifests.argocd-ingress}"

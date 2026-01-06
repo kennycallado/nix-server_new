@@ -1,5 +1,5 @@
 # ClusterIssuer for cert-manager using Let's Encrypt
-{ pkgs, lib ? pkgs.lib, email ? "admin@kennycallado.dev" }:
+{ pkgs, lib ? pkgs.lib, adminEmail }:
 
 let
   # Let's Encrypt Production Issuer
@@ -11,7 +11,7 @@ let
     spec:
       acme:
         server: https://acme-v02.api.letsencrypt.org/directory
-        email: ${email}
+        email: ${adminEmail}
         privateKeySecretRef:
           name: letsencrypt-prod-account-key
         solvers:
@@ -37,7 +37,7 @@ let
     spec:
       acme:
         server: https://acme-staging-v02.api.letsencrypt.org/directory
-        email: ${email}
+        email: ${adminEmail}
         privateKeySecretRef:
           name: letsencrypt-staging-account-key
         solvers:
