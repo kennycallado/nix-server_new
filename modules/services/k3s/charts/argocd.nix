@@ -23,6 +23,14 @@
         requests = { cpu = "100m"; memory = "256Mi"; };
         limits = { cpu = "500m"; memory = "512Mi"; };
       };
+      # Metrics for Prometheus
+      metrics = {
+        enabled = true;
+        serviceMonitor = {
+          enabled = true;
+          namespace = "argocd";
+        };
+      };
     };
     server = {
       replicas = 1;
@@ -35,6 +43,14 @@
         requests = { cpu = "50m"; memory = "128Mi"; };
         limits = { cpu = "200m"; memory = "256Mi"; };
       };
+      # Metrics for Prometheus
+      metrics = {
+        enabled = true;
+        serviceMonitor = {
+          enabled = true;
+          namespace = "argocd";
+        };
+      };
     };
     repoServer = {
       replicas = 1;
@@ -42,12 +58,35 @@
         requests = { cpu = "50m"; memory = "128Mi"; };
         limits = { cpu = "200m"; memory = "256Mi"; };
       };
+      # Metrics for Prometheus
+      metrics = {
+        enabled = true;
+        serviceMonitor = {
+          enabled = true;
+          namespace = "argocd";
+        };
+      };
     };
     redis = {
       enabled = true;
       resources = {
         requests = { cpu = "50m"; memory = "64Mi"; };
         limits = { cpu = "100m"; memory = "128Mi"; };
+      };
+      # Redis exporter metrics
+      exporter = {
+        enabled = true;
+        resources = {
+          requests = { cpu = "10m"; memory = "32Mi"; };
+          limits = { cpu = "50m"; memory = "64Mi"; };
+        };
+      };
+      metrics = {
+        enabled = true;
+        serviceMonitor = {
+          enabled = true;
+          namespace = "argocd";
+        };
       };
     };
     "redis-ha".enabled = false;
@@ -57,6 +96,14 @@
       resources = {
         requests = { cpu = "50m"; memory = "64Mi"; };
         limits = { cpu = "100m"; memory = "128Mi"; };
+      };
+      # Metrics for Prometheus
+      metrics = {
+        enabled = true;
+        serviceMonitor = {
+          enabled = true;
+          namespace = "argocd";
+        };
       };
     };
     dex.enabled = false;

@@ -321,6 +321,29 @@ let
                 storage: ${garageConfig.dataStorageSize}
   '';
 
+  # ServiceMonitor for Prometheus (metrics on port 3903 with bearer token)
+  serviceMonitor = ''
+    apiVersion: monitoring.coreos.com/v1
+    kind: ServiceMonitor
+    metadata:
+      name: garage
+      namespace: garage
+      labels:
+        app.kubernetes.io/name: garage
+    spec:
+      selector:
+        matchLabels:
+          app.kubernetes.io/name: garage
+      endpoints:
+        - port: admin
+          path: /metrics
+          interval: 30s
+          scrapeTimeout: 10s
+          bearerTokenSecret:
+            name: garage-secrets
+            key: metrics-token
+  '';
+
   manifest = lib.concatStringsSep "\n---\n" [
     namespace
     garageNodeCRD
@@ -331,6 +354,7 @@ let
     serviceHeadless
     serviceNodePort
     statefulSet
+    serviceMonitor
   ];
 in
 pkgs.writeText "garage.yaml" manifest

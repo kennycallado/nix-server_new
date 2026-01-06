@@ -29,6 +29,12 @@
         exposedPort = 443;
         hostPort = 443;
       };
+      # Metrics entrypoint for Prometheus
+      metrics = {
+        port = 9100;
+        exposedPort = 9100;
+        expose.default = false;
+      };
     } else {
       web = {
         port = 8000;
@@ -40,6 +46,12 @@
         exposedPort = 443;
         # No hostPort - only accessible via tunnel/port-forward
       };
+      # Metrics entrypoint for Prometheus
+      metrics = {
+        port = 9100;
+        exposedPort = 9100;
+        expose.default = false;
+      };
     };
     # Required for hostPort to work properly (still useful for node affinity)
     deployment.kind = "DaemonSet";
@@ -47,6 +59,19 @@
     logs = {
       general.level = "DEBUG";
       access.enabled = true;
+    };
+    # ===== Metrics for Prometheus =====
+    metrics = {
+      prometheus = {
+        entryPoint = "metrics";
+        # ServiceMonitor for Prometheus Operator
+        serviceMonitor = {
+          enabled = true;
+          namespace = "kube-system";
+          namespaceSelector = { };
+          interval = "30s";
+        };
+      };
     };
   };
 }
