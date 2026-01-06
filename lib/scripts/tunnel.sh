@@ -10,9 +10,17 @@ YELLOW='\033[0;33m'
 DIM='\033[2m'
 NC='\033[0m' # No Color
 
-# Configuración del servidor
-SERVER_IP="46.224.186.182"
-SSH_USER="admin"
+# Configuración del servidor (IP leída desde server-01 config.nix)
+SERVER_IP="${SERVER_IP:-}"
+SSH_USER="${SSH_USER:-admin}"
+
+# Verificar que SERVER_IP esté definida
+if [ -z "$SERVER_IP" ]; then
+  echo -e "${RED}Error:${NC} SERVER_IP no está definida"
+  echo ""
+  echo "Asegúrate de que la IP está configurada en hosts/nodes/server-01/config.nix"
+  exit 1
+fi
 
 # Función para mostrar uso
 show_usage() {

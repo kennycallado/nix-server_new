@@ -22,6 +22,11 @@
     spec.bootstrap = true;
   };
   values = {
+    # ===== Image =====
+    image = {
+      repository = "otel/opentelemetry-collector-contrib";
+    };
+
     # ===== Deployment mode =====
     mode = "deployment"; # Single replica deployment (not daemonset)
     replicaCount = 1;
@@ -113,16 +118,18 @@
               buckets = [ "5ms" "10ms" "25ms" "50ms" "100ms" "250ms" "500ms" "1s" "2.5s" "5s" "10s" ];
             };
           };
-          # Dimensions to include in metrics (from span attributes)
+          # Additional dimensions to include in metrics (from span attributes)
+          # Note: service.name is automatically included by spanmetrics connector
           dimensions = [
-            { name = "service.name"; }
-            { name = "service.namespace"; }
-            # Windmill-specific
+            # Windmill-specific attributes
             { name = "job_id"; }
             { name = "script_path"; }
             { name = "workspace_id"; }
             { name = "worker_id"; }
             { name = "language"; }
+            # HTTP attributes (useful for web services)
+            { name = "http.method"; }
+            { name = "http.status_code"; }
           ];
           dimensions_cache_size = 1000;
           exemplars = { enabled = true; };

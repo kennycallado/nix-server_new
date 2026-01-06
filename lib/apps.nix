@@ -5,6 +5,9 @@ let
   agenix-pkg = agenix.packages.${system}.default;
   constants = import ./constants.nix;
 
+  # Importar configuración de server-01 para obtener la IP del túnel
+  server01Config = import ../hosts/nodes/server-01/config.nix;
+
   # Wrapper que inyecta las dependencias en el script
   wrapScript = name: script: vars:
     pkgs.writeShellScript name ''
@@ -74,6 +77,7 @@ in
   tunnel = {
     type = "app";
     program = toString (pkgs.writeShellScript "tunnel" ''
+      export SERVER_IP="${server01Config.deploy.ip}"
       source ${./scripts/tunnel.sh}
     '');
     meta.description = "SSH tunnel to access K8s services locally";

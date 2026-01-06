@@ -154,10 +154,41 @@ in
 
   # Abrir puertos necesarios
   networking.firewall = lib.mkIf (cfg.enable or false) {
-    allowedTCPPorts = lib.optionals isServer [ 6443 2379 2380 ]
-      ++ [ 10250 ]
+    # Puertos expuestos a todas las interfaces
+    allowedTCPPorts = [ 10250 ]
       ++ lib.optionals exposeServices [ 80 443 ]; # Only expose HTTP/HTTPS when exposeServices is true
     allowedUDPPorts = [ 8472 ];
+
+    # Reglas extra para restringir API de K3s a la VPN (solo en server)
+    extraCommands = lib.mkIf isServer ''
+      # Permitir acceso a API K3s (6443) y Etcd (2379, 2380) desde localhost y red WireGuard
+      iptables -A INPUT -p tcp --dport 6443 -s 127.0.0.1 -j ACCEPT
+      iptables -A INPUT -p tcp --dport 6443 -s 10.100.10.0/24 -j ACCEPT
+      iptables -A INPUT -p tcp --dport 6443 -j DROP
+
+      iptables -A INPUT -p tcp --dport 2379 -s 127.0.0.1 -j ACCEPT
+      iptables -A INPUT -p tcp --dport 2379 -s 10.100.10.0/24 -j ACCEPT
+      iptables -A INPUT -p tcp --dport 2379 -j DROP
+
+      iptables -A INPUT -p tcp --dport 2380 -s 127.0.0.1 -j ACCEPT
+      iptables -A INPUT -p tcp --dport 2380 -s 10.100.10.0/24 -j ACCEPT
+      iptables -A INPUT -p tcp --dport 2380 -j DROP
+    '';
+
+    # Limpiar reglas al detener firewall (evita duplicados)
+    extraStopCommands = lib.mkIf isServer ''
+      iptables -D INPUT -p tcp --dport 6443 -s 127.0.0.1 -j ACCEPT 2>/dev/null || true
+      iptables -D INPUT -p tcp --dport 6443 -s 10.100.10.0/24 -j ACCEPT 2>/dev/null || true
+      iptables -D INPUT -p tcp --dport 6443 -j DROP 2>/dev/null || true
+
+      iptables -D INPUT -p tcp --dport 2379 -s 127.0.0.1 -j ACCEPT 2>/dev/null || true
+      iptables -D INPUT -p tcp --dport 2379 -s 10.100.10.0/24 -j ACCEPT 2>/dev/null || true
+      iptables -D INPUT -p tcp --dport 2379 -j DROP 2>/dev/null || true
+
+      iptables -D INPUT -p tcp --dport 2380 -s 127.0.0.1 -j ACCEPT 2>/dev/null || true
+      iptables -D INPUT -p tcp --dport 2380 -s 10.100.10.0/24 -j ACCEPT 2>/dev/null || true
+      iptables -D INPUT -p tcp --dport 2380 -j DROP 2>/dev/null || true
+    '';
   };
 
   # Dependencias
