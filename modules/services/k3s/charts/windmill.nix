@@ -125,21 +125,22 @@ in
     };
 
     # Ingress configuration (only when exposeServices is true)
-    ingress = if exposeServices then {
-      enabled = true;
-      className = "traefik-ingress";
-      annotations = {
-        "cert-manager.io/cluster-issuer" = "letsencrypt-prod";
-        "traefik.ingress.kubernetes.io/router.entrypoints" = "websecure";
-        "traefik.ingress.kubernetes.io/router.tls" = "true";
+    ingress =
+      if exposeServices then {
+        enabled = true;
+        className = "traefik-ingress";
+        annotations = {
+          "cert-manager.io/cluster-issuer" = "letsencrypt-prod";
+          "traefik.ingress.kubernetes.io/router.entrypoints" = "websecure";
+          "traefik.ingress.kubernetes.io/router.tls" = "true";
+        };
+        tls = [{
+          hosts = [ windmillHost ];
+          secretName = "windmill-tls";
+        }];
+      } else {
+        enabled = false;
       };
-      tls = [{
-        hosts = [ windmillHost ];
-        secretName = "windmill-tls";
-      }];
-    } else {
-      enabled = false;
-    };
 
     # ===== Metrics for Prometheus =====
     # Windmill exposes /metrics on port 8001

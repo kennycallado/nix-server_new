@@ -15,7 +15,7 @@
   name = "opentelemetry-collector";
   repo = "https://open-telemetry.github.io/opentelemetry-helm-charts";
   version = "0.108.0";
-  hash = "sha256-dtcPNh8sYmDG4lQcqCSLBWI892yMl7LMkbaIq976Kpw=";
+  hash = "sha256-DqLqkEBEBf0HSPbFwJ2hzlgcsWZomkZxrrmP8sANeCs=";
   extraFieldDefinitions = {
     spec.targetNamespace = "metrics";
     spec.createNamespace = true;

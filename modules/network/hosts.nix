@@ -104,10 +104,12 @@ in
   inherit nodes;
 
   # External clients from constants (no config.nix, manually defined)
-  clients = builtins.mapAttrs (name: client: {
-    ip.wg = client.ip;
-    wg.publicKey = client.publicKey;
-  }) constants.wgClients;
+  clients = builtins.mapAttrs
+    (name: client: {
+      ip.wg = client.ip;
+      wg.publicKey = client.publicKey;
+    })
+    constants.wgClients;
 
   # Dynamic server resolvers
   inherit findWgServer findNfsServer;

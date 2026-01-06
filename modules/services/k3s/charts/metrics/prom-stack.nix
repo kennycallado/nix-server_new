@@ -141,20 +141,21 @@ in
       ];
 
       # Ingress (only when exposed)
-      ingress = if exposeServices then {
-        enabled = true;
-        ingressClassName = "traefik";
-        annotations = {
-          "cert-manager.io/cluster-issuer" = "letsencrypt-prod";
-        };
-        hosts = [ grafanaHost ];
-        tls = [{
-          secretName = "grafana-tls";
+      ingress =
+        if exposeServices then {
+          enabled = true;
+          ingressClassName = "traefik";
+          annotations = {
+            "cert-manager.io/cluster-issuer" = "letsencrypt-prod";
+          };
           hosts = [ grafanaHost ];
-        }];
-      } else {
-        enabled = false;
-      };
+          tls = [{
+            secretName = "grafana-tls";
+            hosts = [ grafanaHost ];
+          }];
+        } else {
+          enabled = false;
+        };
     };
 
     # ===== Kube State Metrics =====
