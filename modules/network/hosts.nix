@@ -1,18 +1,18 @@
-# Auto-descubrimiento de nodos desde hosts/nodes/*/config.nix
-# Cada config.nix es la fuente de verdad de su propio nodo
-# State (IPs, keys) se inyecta desde hosts/state/*.json via lib/state.nix
+# Auto-discovery of nodes from hosts/nodes/*/config.nix
+# Each config.nix is the source of truth for its node
+# WireGuard public keys are injected from hosts/state/wireguard.json via lib/state.nix
 let
   root = ../../.;
   nodesDir = root + "/hosts/nodes";
 
-  # Usar lib/discover.nix para descubrir nodos
+  # Use lib/discover.nix to discover nodes
   discover = import ../../lib/discover.nix;
   nodeNames = discover nodesDir;
 
   # Import state layer for merging
   state = import ../../lib/state.nix { inherit root; };
 
-  # Importar y mergear configs con state
+  # Import and merge configs with state
   nodeConfigs = builtins.listToAttrs (map
     (name:
       let
@@ -24,37 +24,36 @@ let
       })
     nodeNames);
 
-  # Check if a node has required state (IP provisioned)
-  # Nodes without state are skipped in hosts map (not yet provisioned)
-  hasRequiredState = name: cfg:
-    (cfg.deploy.ip or null) != null;
+  # Check if a node has all required WireGuard config (including publicKey from keygen)
+  isWgReady = name: cfg:
+    cfg.wireguard.enable or false &&
+    cfg ? wireguard.ip &&
+    cfg ? wireguard.isServer &&
+    (cfg.wireguard.publicKey or null) != null;
 
-  # Validar un nodo (solo nodos con state - ya provisionados)
+  # Validate basic node configuration (doesn't require publicKey)
   validate = name: cfg:
     let
       check = cond: msg: if !cond then throw "Node '${name}': ${msg}" else true;
-      checkNotNull = val: msg: if val == null then throw "Node '${name}': ${msg}" else true;
     in
     check (cfg ? hostname) "missing 'hostname'" &&
     check (cfg.hostname == name) "hostname '${cfg.hostname}' doesn't match directory" &&
     check (cfg ? wireguard.enable) "missing 'wireguard.enable'" &&
     (if cfg.wireguard.enable then
       check (cfg ? wireguard.ip) "missing 'wireguard.ip'" &&
-      checkNotNull (cfg.wireguard.publicKey or null) "missing 'wireguard.publicKey' (check hosts/state/wireguard.json)" &&
       check (cfg ? wireguard.isServer) "missing 'wireguard.isServer'"
     else true);
 
-  # Solo validar nodos que tienen state (IP provisionada)
-  provisionedNodes = builtins.filter (name: hasRequiredState name nodeConfigs.${name}) nodeNames;
-  allValid = builtins.all (name: validate name nodeConfigs.${name}) provisionedNodes;
+  # Validate all nodes (basic validation)
+  allValid = builtins.all (name: validate name nodeConfigs.${name}) nodeNames;
 
-  # Construir estructura de nodos (solo provisionados con WireGuard habilitado)
+  # Build nodes structure (only nodes with WireGuard ready - has publicKey)
   nodes = assert allValid; builtins.listToAttrs (
     builtins.filter (x: x != null) (map
       (name:
         let cfg = nodeConfigs.${name}; in
-        # Solo incluir si tiene IP (provisionado) Y WireGuard habilitado
-        if (hasRequiredState name cfg) && (cfg.wireguard.enable or false) then {
+        # Only include if WireGuard is ready (has publicKey from keygen)
+        if isWgReady name cfg then {
           inherit name;
           value = {
             ip.public = cfg.deploy.ip;
@@ -69,9 +68,7 @@ let
 
   # ===== Dynamic Server Resolvers =====
 
-  # Find the WireGuard server node
-  # Returns: node name (string) where wg.isServer == true
-  # Throws: if no server found
+  # Find the WireGuard server node (only among ready nodes)
   findWgServer =
     let
       servers = builtins.filter
@@ -79,20 +76,19 @@ let
         (builtins.attrNames nodes);
     in
     if builtins.length servers == 0
-    then throw "No WireGuard server found in nodes"
+    then null # Return null instead of throwing - no server ready yet
     else builtins.head servers;
 
-  # Find the NFS server node
-  # Returns: node name (string) where nfs.enable == true in config.nix
-  # Falls back to WireGuard server if no NFS server configured
+  # Find the NFS server node (only among ready nodes in hosts.nodes)
   findNfsServer =
     let
+      readyNodeNames = builtins.attrNames nodes;
       nfsServers = builtins.filter
         (name: nodeConfigs.${name}.nfs.enable or false)
-        nodeNames;
+        readyNodeNames;
     in
     if builtins.length nfsServers == 0
-    then findWgServer  # Fallback to WG server
+    then findWgServer # Fallback to WG server (could be null)
     else builtins.head nfsServers;
 
 in
@@ -105,7 +101,6 @@ in
   inherit nodes;
 
   # External clients (no config.nix, manually defined)
-  # TODO: read from a separate file?
   clients = {
     ryzen = {
       ip.wg = "10.100.10.100";

@@ -3,54 +3,55 @@ let
   inherit (conf) hostname;
   enabled = conf.wireguard.enable or false;
 
-  # Solo buscar este nodo si está en hosts.nodes (provisionado)
-  nodeExists = hosts.nodes ? ${hostname};
-  thisNode = if nodeExists then hosts.nodes.${hostname} else null;
-  otherNodes = if nodeExists then lib.filterAttrs (name: _: name != hostname) hosts.nodes else { };
+  # Check if this node is ready (has publicKey in hosts.nodes)
+  nodeReady = hosts.nodes ? ${hostname};
 
-  # Encuentra el servidor WireGuard (solo si hay nodos)
-  hasNodes = hosts.nodes != { };
+  # Get this node and others from hosts (only if ready)
+  thisNode = if nodeReady then hosts.nodes.${hostname} else null;
+  otherNodes = if nodeReady then lib.filterAttrs (name: _: name != hostname) hosts.nodes else { };
+
+  # Find WireGuard server (only among ready nodes)
   serverNode =
-    if hasNodes then lib.findFirst (node: node.wg.isServer) null (lib.attrValues hosts.nodes) else null;
-
+    if hosts.nodes != { }
+    then lib.findFirst (node: node.wg.isServer) null (lib.attrValues hosts.nodes)
+    else null;
   serverName =
-    if hasNodes then
-      lib.findFirst (name: hosts.nodes.${name}.wg.isServer) null (lib.attrNames hosts.nodes)
-    else
-      null;
+    if hosts.nodes != { }
+    then lib.findFirst (name: hosts.nodes.${name}.wg.isServer) null (lib.attrNames hosts.nodes)
+    else null;
 
   isServer = if thisNode != null then thisNode.wg.isServer else false;
 
-  # Solo habilitar si el nodo existe en hosts (provisionado) y wireguard enabled
-  actuallyEnabled = enabled && nodeExists;
+  # Only actually enable if node is ready (has publicKey)
+  actuallyEnabled = enabled && nodeReady;
 in
 {
-  imports = lib.optionals (actuallyEnabled && thisNode != null) [
+  imports = lib.optionals actuallyEnabled [
     (if isServer then ./server.nix else ./peer.nix)
   ];
 
   config = lib.mkIf actuallyEnabled {
-    # Secreto: clave privada WireGuard
+    # Secret: WireGuard private key
     age.secrets.wireguard-private = {
       file = ../../../secrets/wireguard-${hostname}.age;
       mode = "0400";
     };
 
-    # /etc/hosts con IPs de WireGuard para resolver nombres
+    # DNS: resolve hostnames via WireGuard IPs
     networking.hosts = lib.mapAttrs' (name: node: lib.nameValuePair node.ip.wg [ name ]) hosts.nodes;
 
-    # Interfaz WireGuard
+    # WireGuard interface
     networking.wireguard.interfaces.wg0 = {
       ips = [ "${thisNode.ip.wg}/24" ];
       listenPort = lib.mkIf isServer hosts.wireguard.port;
       privateKeyFile = config.age.secrets.wireguard-private.path;
     };
 
-    # Firewall: permitir puerto WireGuard (solo server)
+    # Firewall: allow WireGuard port (server only)
     networking.firewall.allowedUDPPorts = lib.mkIf isServer [ hosts.wireguard.port ];
   };
 
-  # Exportar para uso en server.nix y peer.nix
+  # Export for use in server.nix and peer.nix
   options.wireguard = {
     _hosts = lib.mkOption { default = hosts; };
     _thisNode = lib.mkOption { default = thisNode; };

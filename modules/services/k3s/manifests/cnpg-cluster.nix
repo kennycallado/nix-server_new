@@ -3,8 +3,9 @@
 # Secrets manejados por SealedSecrets (sealedsecrets/postgres.yaml):
 # - postgresql-superuser: usuario postgres (superuser)
 # - windmill-user: usuario windmill para la aplicación
+# - cnpg-s3-creds: credenciales S3 para backups a Garage
 #
-{ serverToleration, pkgs, lib ? pkgs.lib }:
+{ pkgs, lib ? pkgs.lib, serverToleration ? [ ] }:
 
 let
   # Namespace
@@ -75,7 +76,7 @@ let
       name: postgresql
       namespace: postgres
     spec:
-      instances: 1
+      instances: 1 # TODO: maybe per instance...
       primaryUpdateStrategy: unsupervised
 
       postgresql:
@@ -122,6 +123,39 @@ let
           - key: node-role.kubernetes.io/control-plane
             operator: Exists
             effect: NoSchedule
+
+      # Backups to Garage (S3-compatible)
+      backup:
+        barmanObjectStore:
+          destinationPath: s3://cnpg-backups/
+          endpointURL: http://garage.garage.svc.cluster.local:3900
+          s3Credentials:
+            accessKeyId:
+              name: cnpg-s3-creds
+              key: ACCESS_KEY_ID
+            secretAccessKey:
+              name: cnpg-s3-creds
+              key: ACCESS_SECRET_KEY
+          wal:
+            compression: gzip
+          data:
+            compression: gzip
+        retentionPolicy: "7d"
+  '';
+
+  # Scheduled backup
+  scheduledBackup = ''
+    apiVersion: postgresql.cnpg.io/v1
+    kind: ScheduledBackup
+    metadata:
+      name: postgresql-daily-backup
+      namespace: postgres
+    spec:
+      schedule: "0 3 * * *"
+      backupOwnerReference: self
+      cluster:
+        name: postgresql
+      immediate: true
   '';
 
   manifest = lib.concatStringsSep "\n---\n" [
@@ -129,6 +163,7 @@ let
     initConfigMap
     appInitConfigMap
     cluster
+    scheduledBackup
   ];
 in
 pkgs.writeText "cnpg-cluster.yaml" manifest

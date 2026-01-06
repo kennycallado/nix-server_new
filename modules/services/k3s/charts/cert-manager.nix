@@ -20,5 +20,6 @@
     webhook.nodeSelector."node-role.kubernetes.io/control-plane" = "true";
     cainjector.nodeSelector."node-role.kubernetes.io/control-plane" = "true";
     startupapicheck.nodeSelector."node-role.kubernetes.io/control-plane" = "true";
+    # ACME HTTP-01 solver tolerations are configured in the ClusterIssuer podTemplate
   };
 }

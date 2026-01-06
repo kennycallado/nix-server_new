@@ -1,9 +1,7 @@
-# Configuración de hardware para servidores x86_64
-{ config, lib, modulesPath, ... }:
+{ conf, config, lib, modulesPath, ... }:
 
 {
   imports = [
-    # qemu-guest: módulos virtio necesarios para VMs en Hetzner
     (modulesPath + "/profiles/qemu-guest.nix")
   ];
 
@@ -17,29 +15,14 @@
     cpu.amd.updateMicrocode = lib.mkDefault config.hardware.enableRedistributableFirmware;
   };
 
-  # Boot configuration for x86_64
+  # Boot configuration for x86_64 (BIOS/Legacy mode for Hetzner Cloud)
   boot = {
     loader.grub = {
       enable = true;
-      efiSupport = true;
-      efiInstallAsRemovable = true;
+      efiSupport = false;
     };
 
-    initrd.availableKernelModules = [
-      "ahci"
-      "xhci_pci"
-      "virtio_pci"
-      "virtio_scsi"
-      "sd_mod"
-      "sr_mod"
-    ];
-
-    kernelModules = [
-      "kvm-intel"
-      "kvm-amd"
-    ];
+    kernelModules = [ "kvm-intel" "kvm-amd" ];
+    initrd.availableKernelModules = [ "ahci" "xhci_pci" "virtio_pci" "virtio_scsi" "sd_mod" "sr_mod" ];
   };
-
-  # Networking
-  networking.useDHCP = lib.mkDefault true;
 }

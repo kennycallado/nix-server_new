@@ -3,6 +3,7 @@ let
   cfg = conf.k3s or { };
   isServer = cfg.role or "agent" == "server";
   isFirstServer = cfg.serverAddr or "" == "";
+  exposeServices = cfg.exposeServices or false; # Whether to expose services via public ingress
 
   serverToleration = [{
     key = "node-role.kubernetes.io/control-plane";
@@ -10,7 +11,19 @@ let
     effect = "NoSchedule";
   }];
 
-  nfsServerIp = hosts.nodes.${hosts.findNfsServer}.ip.wg;
+  # NFS server IP (only available when nodes have WireGuard keys)
+  nfsServerIp =
+    if hosts.findNfsServer != null
+    then hosts.nodes.${hosts.findNfsServer}.ip.wg
+    else "10.100.10.1"; # Fallback, will be updated when keys are generated
+
+  # Calculate number of agent nodes for Garage replicas
+  # Agent nodes are those without wg.isServer (non-control-plane nodes)
+  agentNodes = lib.filterAttrs (n: v: !(v.wg.isServer or false)) hosts.nodes;
+  numAgents = lib.length (lib.attrNames agentNodes);
+
+  # Ensure at least 1 replica if no agents are defined (though unlikely)
+  garageReplicas = if numAgents > 0 then numAgents else 1;
 
   # PostgreSQL passwords manejados por SealedSecrets (sealedsecrets/postgres.yaml)
 
@@ -18,8 +31,8 @@ let
   # Los secrets (rpcSecret, adminToken, metricsToken) están en SealedSecrets
   garageConfig = {
     version = "v2.1.0";
-    replicas = 2; # Un pod por worker node
-    replicationFactor = 2; # Datos replicados en 2 nodos
+    replicas = garageReplicas; # Un pod por worker node
+    replicationFactor = if garageReplicas < 2 then 1 else 2; # Datos replicados en 2 nodos (o 1 si solo hay 1)
     s3Region = "garage";
     metaStorageSize = "500Mi";
     dataStorageSize = "20Gi";
@@ -27,16 +40,14 @@ let
 
   # Configuración de Garage WebUI
   # adminToken viene del SealedSecret garage-secrets
+  # authUserPass viene del SealedSecret garage-webui-auth
   garageWebuiConfig = {
     version = "latest";
     inherit (garageConfig) s3Region;
-    # Autenticación básica (opcional)
-    # Generar con: htpasswd -nbBC 10 "admin" "password"
-    authUserPass = ""; # Formato: "username:$2y$10$..."
   };
 
   # Helm charts (autoDeployCharts)
-  charts = import ./charts { inherit serverToleration nfsServerIp; };
+  charts = import ./charts { inherit serverToleration nfsServerIp exposeServices; };
 
   # Raw manifests (desplegados via k3s auto-deploy)
   manifests = {
@@ -49,6 +60,12 @@ let
     };
     garage-webui = import ./manifests/garage-webui.nix {
       inherit pkgs lib garageWebuiConfig;
+    };
+    cluster-issuer = import ./manifests/cluster-issuer.nix {
+      inherit pkgs lib;
+    };
+    argocd-ingress = import ./manifests/argocd-ingress.nix {
+      inherit pkgs lib;
     };
   };
 in
@@ -91,12 +108,15 @@ in
     extraFlags = lib.concatStringsSep " " (
       (lib.optionals isServer [
         "--disable=traefik"
-        "--disable=servicelb"
         "--write-kubeconfig-mode=644"
         # Taint para que workloads no corran en control-plane
         # Los helm-install jobs de k3s toleran este taint cuando spec.bootstrap=true
         "--node-taint=node-role.kubernetes.io/control-plane:NoSchedule"
-        "--tls-san=${hosts.nodes.${hosts.findWgServer}.ip.wg}"
+        "--tls-san=${
+          if hosts.findWgServer != null
+          then hosts.nodes.${hosts.findWgServer}.ip.wg
+          else "10.100.10.1"
+        }"
       ])
       ++ (cfg.extraFlags or [ ])
     );
@@ -106,19 +126,26 @@ in
   };
 
   # Manifests adicionales para k3s auto-deploy
-  systemd.tmpfiles.rules = lib.mkIf (isServer && (cfg.enable or false)) [
+  systemd.tmpfiles.rules = lib.mkIf (isServer && (cfg.enable or false)) ([
     "L+ /var/lib/rancher/k3s/server/manifests/cnpg-cluster.yaml - - - - ${manifests.cnpg-cluster}"
     "L+ /var/lib/rancher/k3s/server/manifests/garage.yaml - - - - ${manifests.garage}"
     "L+ /var/lib/rancher/k3s/server/manifests/garage-webui.yaml - - - - ${manifests.garage-webui}"
+    "L+ /var/lib/rancher/k3s/server/manifests/cluster-issuer.yaml - - - - ${manifests.cluster-issuer}"
     # SealedSecrets - se desencriptan automáticamente por el controller
     "L+ /var/lib/rancher/k3s/server/manifests/garage-sealed.yaml - - - - ${./sealedsecrets/garage.yaml}"
     "L+ /var/lib/rancher/k3s/server/manifests/postgres-sealed.yaml - - - - ${./sealedsecrets/postgres.yaml}"
     "L+ /var/lib/rancher/k3s/server/manifests/windmill-sealed.yaml - - - - ${./sealedsecrets/windmill.yaml}"
-  ];
+    "L+ /var/lib/rancher/k3s/server/manifests/windmill-superadmin-sealed.yaml - - - - ${./sealedsecrets/windmill-superadmin.yaml}"
+  ] ++ lib.optionals exposeServices [
+    # Public ingress for ArgoCD (only when exposeServices is true)
+    "L+ /var/lib/rancher/k3s/server/manifests/argocd-ingress.yaml - - - - ${manifests.argocd-ingress}"
+  ]);
 
   # Abrir puertos necesarios
   networking.firewall = lib.mkIf (cfg.enable or false) {
-    allowedTCPPorts = lib.optionals isServer [ 6443 2379 2380 ] ++ [ 10250 ];
+    allowedTCPPorts = lib.optionals isServer [ 6443 2379 2380 ]
+      ++ [ 10250 ]
+      ++ lib.optionals exposeServices [ 80 443 ]; # Only expose HTTP/HTTPS when exposeServices is true
     allowedUDPPorts = [ 8472 ];
   };
 

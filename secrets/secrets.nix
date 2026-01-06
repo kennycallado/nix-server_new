@@ -22,7 +22,4 @@ in
   # Sealed Secrets - clave maestra para reproducibilidad
   # Solo el server necesita la clave privada (para inyectarla en k8s)
   "sealed-secrets-key.age".publicKeys = [ admin server-01 ];
-
-  # Hetzner Cloud Token (solo para uso local por admin)
-  "hcloud-token.age".publicKeys = [ admin ];
 }

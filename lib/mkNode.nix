@@ -67,7 +67,7 @@ let
     disko.nixosModules.disko
     (import (configDir + "/../../hardware/disko.nix") { device = conf.disk; })
     hardwareModule
-    (configDir + "/../../../modules/bootstrap/minimal.nix")
+    (configDir + "/../../../modules/system/minimal.nix")
 
     # Inherit network identity from node config
     {

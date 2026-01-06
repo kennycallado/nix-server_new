@@ -1,122 +1,108 @@
 #!/usr/bin/env bash
-# Despliega configuración NixOS a hosts usando deploy-rs con remote build
-# Uso: deploy.sh <hostname> | --all
-# Variables esperadas: JQ_BIN
+# Deploy NixOS configuration to hosts using deploy-rs with remote build
+# Usage: deploy.sh <hostname> | --all
 
 set -e
 
 HOST="${1:-}"
 
 if [ -z "$HOST" ]; then
-  echo "Uso: nix run .#deploy -- <hostname>"
-  echo "      nix run .#deploy -- --all"
+  echo "Usage: nix run .#deploy -- <hostname>"
+  echo "       nix run .#deploy -- --all"
   echo ""
-  echo "Ejemplos:"
-  echo "  nix run .#deploy -- server-01    # Deploy a un host específico"
-  echo "  nix run .#deploy -- --all        # Deploy a todos los hosts"
+  echo "Examples:"
+  echo "  nix run .#deploy -- server-01    # Deploy to a specific host"
+  echo "  nix run .#deploy -- --all        # Deploy to all hosts"
   echo ""
-  echo "Nota: La compilación se realiza en el servidor remoto (remoteBuild=true)"
+  echo "Note: Build runs on the remote server (remoteBuild=true)"
   exit 1
 fi
 
 PROJECT_ROOT="$(pwd)"
-STATE_DIR="$PROJECT_ROOT/hosts/state"
-NODES_FILE="$STATE_DIR/nodes.json"
+NODES_DIR="$PROJECT_ROOT/hosts/nodes"
 
-# Colores
+# Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
 log_info() { echo -e "${BLUE}info${NC} $1"; }
 log_success() { echo -e "${GREEN}ok${NC} $1"; }
 log_warn() { echo -e "${YELLOW}warn${NC} $1"; }
 log_error() { echo -e "${RED}error${NC} $1"; }
 
-# =============================================================================
-# Validar que existe nodes.json
-# =============================================================================
-if [ ! -f "$NODES_FILE" ]; then
-  log_error "No existe $NODES_FILE"
-  echo ""
-  echo "Primero debes aprovisionar al menos un host:"
-  echo "  nix run .#provision -- <hostname>"
-  exit 1
-fi
+# Get IP from deploy-rs config via nix eval
+get_host_ip() {
+  local host="$1"
+  nix eval --raw ".#deploy.nodes.${host}.hostname" 2>/dev/null || echo ""
+}
 
-# =============================================================================
-# Función para deployar un host
-# =============================================================================
+# Get all configured hosts from hosts/nodes/*/
+get_all_hosts() {
+  for dir in "$NODES_DIR"/*/; do
+    basename "$dir"
+  done
+}
+
+# Deploy a single host
 deploy_host() {
   local target_host="$1"
 
-  # Validar que el host existe en nodes.json
-  local host_data
-  host_data=$($JQ_BIN -r ".[\"$target_host\"] // empty" "$NODES_FILE")
-
-  if [ -z "$host_data" ]; then
-    log_error "Host '$target_host' no encontrado en $NODES_FILE"
+  # Check host exists
+  if [ ! -d "$NODES_DIR/$target_host" ]; then
+    log_error "Host '$target_host' not found in hosts/nodes/"
     echo ""
-    echo "Hosts disponibles:"
-    $JQ_BIN -r 'keys[]' "$NODES_FILE" 2>/dev/null | sed 's/^/  - /' || echo "  (ninguno)"
+    echo "Available hosts:"
+    get_all_hosts | sed 's/^/  - /'
     return 1
   fi
 
+  # Get IP from config.nix
   local host_ip
-  host_ip=$($JQ_BIN -r ".[\"$target_host\"].public_ip // \"unknown\"" "$NODES_FILE")
-  local host_status
-  host_status=$($JQ_BIN -r ".[\"$target_host\"].status // \"unknown\"" "$NODES_FILE")
+  host_ip=$(get_host_ip "$target_host")
+
+  if [ -z "$host_ip" ] || [ "$host_ip" = "null" ]; then
+    log_error "No IP configured for '$target_host'"
+    echo ""
+    echo "Set deploy.ip in hosts/nodes/$target_host/config.nix"
+    return 1
+  fi
 
   echo ""
   echo "=========================================="
   log_info "Deploying $target_host"
   echo "=========================================="
-  echo "  IP:     $host_ip"
-  echo "  Status: $host_status"
+  echo "  IP: $host_ip"
   echo ""
 
-  # Advertir si el host no está en estado 'running'
-  if [ "$host_status" != "running" ]; then
-    log_warn "El host tiene status '$host_status' (no 'running')"
-    echo "  El deploy puede fallar si el host no está completamente provisionado."
-    echo ""
-  fi
-
-  log_info "Iniciando deploy con remote build habilitado..."
-  log_info "La compilación se realizará en el servidor remoto ($host_ip)"
+  log_info "Starting deploy with remote build..."
   echo ""
 
-  # Ejecutar deploy-rs
+  # Run deploy-rs
   if nix run nixpkgs#deploy-rs -- ".#$target_host"; then
-    log_success "Deploy completado para $target_host"
+    log_success "Deploy completed for $target_host"
     return 0
   else
-    log_error "Deploy falló para $target_host"
+    log_error "Deploy failed for $target_host"
     return 1
   fi
 }
 
-# =============================================================================
-# Modo --all: deployar a todos los hosts
-# =============================================================================
+# --all mode: deploy to all hosts
 if [ "$HOST" = "--all" ]; then
-  log_info "Deploy a todos los hosts..."
+  log_info "Deploying to all hosts..."
 
-  # Obtener lista de hosts
-  HOSTS=$($JQ_BIN -r 'keys[]' "$NODES_FILE" 2>/dev/null)
+  HOSTS=$(get_all_hosts)
 
   if [ -z "$HOSTS" ]; then
-    log_error "No hay hosts en $NODES_FILE"
-    echo ""
-    echo "Primero debes aprovisionar al menos un host:"
-    echo "  nix run .#provision -- <hostname>"
+    log_error "No hosts found in hosts/nodes/"
     exit 1
   fi
 
   HOST_COUNT=$(echo "$HOSTS" | wc -l)
-  log_info "Se encontraron $HOST_COUNT host(s)"
+  log_info "Found $HOST_COUNT host(s)"
 
   FAILED_HOSTS=()
   SUCCESS_HOSTS=()
@@ -129,21 +115,21 @@ if [ "$HOST" = "--all" ]; then
     fi
   done
 
-  # Resumen final
+  # Summary
   echo ""
   echo "=========================================="
-  echo "RESUMEN DE DEPLOY"
+  echo "DEPLOY SUMMARY"
   echo "=========================================="
 
   if [ ${#SUCCESS_HOSTS[@]} -gt 0 ]; then
-    log_success "Exitosos (${#SUCCESS_HOSTS[@]}):"
+    log_success "Successful (${#SUCCESS_HOSTS[@]}):"
     for h in "${SUCCESS_HOSTS[@]}"; do
       echo "    - $h"
     done
   fi
 
   if [ ${#FAILED_HOSTS[@]} -gt 0 ]; then
-    log_error "Fallidos (${#FAILED_HOSTS[@]}):"
+    log_error "Failed (${#FAILED_HOSTS[@]}):"
     for h in "${FAILED_HOSTS[@]}"; do
       echo "    - $h"
     done
@@ -151,23 +137,16 @@ if [ "$HOST" = "--all" ]; then
   fi
 
   echo ""
-  log_success "Todos los deploys completados exitosamente!"
+  log_success "All deploys completed successfully!"
   exit 0
 fi
 
-# =============================================================================
-# Modo normal: deployar a un host específico
-# =============================================================================
+# Normal mode: deploy to specific host
 if deploy_host "$HOST"; then
   echo ""
   echo "=========================================="
-  log_success "Deploy completado!"
+  log_success "Deploy completed!"
   echo "=========================================="
-  echo ""
-  echo "Próximos pasos:"
-  echo "  - Ver estado:  nix run .#status"
-  echo "  - SSH:         ssh admin@\$($JQ_BIN -r '.[\"$HOST\"].public_ip' \"$NODES_FILE\")"
-  echo ""
   exit 0
 else
   exit 1

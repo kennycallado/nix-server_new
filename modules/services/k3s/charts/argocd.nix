@@ -26,7 +26,10 @@
     };
     server = {
       replicas = 1;
+      extraArgs = [ "--insecure" ];
       service.type = "ClusterIP";
+      # Ingress disabled - using IngressRoute CRD instead (argocd-ingress.nix)
+      # This is required because Traefik ignores serversscheme annotation
       ingress.enabled = false;
       resources = {
         requests = { cpu = "50m"; memory = "128Mi"; };

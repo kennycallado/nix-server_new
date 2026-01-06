@@ -1,4 +1,4 @@
-{ serverToleration }:
+{ serverToleration, exposeServices }:
 
 let
   # InitContainer que espera a que PostgreSQL esté disponible
@@ -39,8 +39,8 @@ in
 
     # Configuración principal de Windmill
     windmill = {
-      baseDomain = "windmill.local";
-      baseProtocol = "http";
+      baseDomain = "windmill.kennycallado.dev";
+      baseProtocol = "https";
       appReplicas = 1;
       lspReplicas = 1;
       multiplayerReplicas = 0; # Solo Enterprise
@@ -57,6 +57,23 @@ in
           requests = { cpu = "100m"; memory = "256Mi"; };
           limits = { cpu = "500m"; memory = "512Mi"; };
         };
+        # Superadmin credentials from SealedSecret
+        extraEnv = [
+          {
+            name = "SUPERADMIN_INITIAL_EMAIL";
+            valueFrom.secretKeyRef = {
+              name = "windmill-superadmin";
+              key = "email";
+            };
+          }
+          {
+            name = "SUPERADMIN_INITIAL_PASSWORD";
+            valueFrom.secretKeyRef = {
+              name = "windmill-superadmin";
+              key = "password";
+            };
+          }
+        ];
       };
 
       # Worker groups - corren en control-plane
@@ -103,7 +120,21 @@ in
       };
     };
 
-    # Ingress deshabilitado
-    ingress.enabled = false;
+    # Ingress configuration (only when exposeServices is true)
+    ingress = if exposeServices then {
+      enabled = true;
+      className = "traefik-ingress";
+      annotations = {
+        "cert-manager.io/cluster-issuer" = "letsencrypt-prod";
+        "traefik.ingress.kubernetes.io/router.entrypoints" = "websecure";
+        "traefik.ingress.kubernetes.io/router.tls" = "true";
+      };
+      tls = [{
+        hosts = [ "windmill.kennycallado.dev" ];
+        secretName = "windmill-tls";
+      }];
+    } else {
+      enabled = false;
+    };
   };
 }

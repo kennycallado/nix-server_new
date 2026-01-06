@@ -58,11 +58,12 @@ let
                     secretKeyRef:
                       name: garage-secrets
                       key: admin-token
-                ${lib.optionalString (garageWebuiConfig.authUserPass != "") ''
-                # Basic auth (format: username:bcrypt_hash)
+                # Basic auth from SealedSecret
                 - name: AUTH_USER_PASS
-                  value: "${garageWebuiConfig.authUserPass}"
-                ''}
+                  valueFrom:
+                    secretKeyRef:
+                      name: garage-webui-auth
+                      key: AUTH_USER_PASS
               resources:
                 requests:
                   cpu: "50m"

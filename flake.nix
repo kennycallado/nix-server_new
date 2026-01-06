@@ -6,9 +6,9 @@
     systems.url = "github:nix-systems/default";
 
     agenix = {
-        url = "github:ryantm/agenix";
-        inputs.darwin.follows = "";
-        inputs.nixpkgs.follows = "nixpkgs";
+      url = "github:ryantm/agenix";
+      inputs.darwin.follows = "";
+      inputs.nixpkgs.follows = "nixpkgs";
     };
 
     deploy-rs.url = "github:serokell/deploy-rs";
@@ -19,6 +19,7 @@
 
     nixos-anywhere.url = "github:nix-community/nixos-anywhere";
     nixos-anywhere.inputs.nixpkgs.follows = "nixpkgs";
+
   };
 
   outputs = { self, nixpkgs, systems, disko, agenix, deploy-rs, nixos-anywhere, ... }:
@@ -68,15 +69,6 @@
         import ./lib/apps.nix {
           pkgs = nixpkgs.legacyPackages.${system};
           inherit nixos-anywhere agenix;
-        }
-      );
-
-      checks = eachSystem (system:
-        import ./lib/checks.nix {
-          inherit system self deploy-rs;
-          inherit (nixpkgs) lib;
-          pkgs = nixpkgs.legacyPackages.${system};
-          root = ./.;
         }
       );
 

@@ -1,107 +1,76 @@
 # Webslab Infrastructure
 
-Infraestructura del servidor Webslab gestionada con **NixOS**, **k3s** y **WireGuard**.
+Cluster K3s sobre NixOS con WireGuard, gestionado declarativamente.
 
 ## Requisitos
 
-- **Nix** con _experimental features_ (`flakes`, `nix-command`).
-- Acceso SSH `root` al servidor destino (para instalación inicial).
-- Clave SSH `~/.ssh/id_ed25519` configurada como administrador.
+- Nix con flakes (`nix-command`, `flakes`)
+- Clave SSH en `~/.ssh/id_ed25519`
+- Servidor con acceso root (rescue mode o imagen limpia)
 
-## 🚀 Bootstrap (Instalación Inicial)
-
-### Opción A: Provisión Automatizada (Hetzner)
+## Comandos
 
 ```bash
-# 1. Crear hosts/nodes/agent_03/config.nix con infra.provider = "hetzner"
-# 2. Provisionar (crea servidor, genera claves, instala NixOS)
-HCLOUD_TOKEN=xxx nix run .#provision -- agent_03
+nix run .#<comando> -- [args]
 ```
 
-### Opción B: Manual (cualquier proveedor)
+| Comando           | Descripción                          |
+| ----------------- | ------------------------------------ |
+| `check`           | Valida formatting y configuraciones  |
+| `keygen <host>`   | Genera claves SSH y WireGuard        |
+| `install-minimal` | Instala NixOS base (Phase 1)         |
+| `deploy <host>`   | Despliega configuración (Phase 2)    |
+| `seal`            | Sella secretos para Kubernetes       |
+| `agenix`          | CLI de agenix                        |
 
-1.  **Configuración**: Crear `hosts/nodes/agent_03/config.nix`.
-2.  **Generar Claves**:
-    ```bash
-    nix run .#keygen -- agent_03
-    ```
-3.  **Actualizar Secretos**:
-    ```bash
-    nix run .#rekey
-    ```
-4.  **Instalar NixOS**:
-    ```bash
-    nix run .#install -- agent_03 <IP_PUBLICA>
-    ```
-
-## 🔄 Despliegue (Actualizaciones)
-
-Para aplicar cambios en nodos existentes:
+## Añadir un nuevo nodo
 
 ```bash
-# Un solo nodo
-deploy .#server_01
+# 1. Crear config (copiar de uno existente)
+cp -r hosts/nodes/agent-01 hosts/nodes/nuevo-nodo
+# Editar config.nix: hostname, wireguard.ip, k3s.role, deploy.ip
 
-# Todo el cluster
-deploy
+# 2. Añadir a git (necesario para que flake lo detecte)
+git add hosts/nodes/nuevo-nodo
+
+# 3. Generar claves SSH y WireGuard
+nix run .#keygen -- nuevo-nodo
+
+# 4. Añadir claves a secrets/secrets.nix
+
+# 5. Actualizar nodos existentes (nuevos peers WireGuard)
+nix run .#deploy -- --all
+
+# 6. Instalar NixOS en el nuevo nodo
+nix run .#install-minimal -- nuevo-nodo
+nix run .#deploy -- nuevo-nodo
 ```
 
-## 🔍 Estado del Cluster
+## Despliegue
 
 ```bash
-# Ver estado local vs Hetzner (requiere HCLOUD_TOKEN para Hetzner)
-nix run .#status
+nix run .#deploy -- server-01    # Un nodo
+nix run .#deploy -- --all        # Todos
 ```
 
-## 🗑️ Destrucción de Nodos
+## Secretos
+
+**Sistema (agenix):** `secrets/*.age` - claves SSH, WireGuard, passwords.
+
+**Kubernetes (sealed-secrets):** `modules/services/k3s/sealedsecrets/*.yaml`
 
 ```bash
-# Destruir servidor en Hetzner y limpiar estado local
-HCLOUD_TOKEN=xxx nix run .#destroy -- agent_03
+kubectl create secret generic my-secret \
+  --from-literal=key=value \
+  --dry-run=client -o yaml | nix run .#seal -- - sealedsecrets/my-secret.yaml
 ```
 
-## 🔐 Gestión de Secretos
+## Acceso al cluster
 
-### Sistema (Agenix)
-
-Secretos de infraestructura (claves WireGuard, passwords de usuario).
-Configurados en `secrets/secrets.nix`.
+Requiere conexión WireGuard activa.
 
 ```bash
-# Regenerar tras cambios en claves SSH o secrets.nix
-nix run .#rekey
+ssh admin@server-01 "sudo cat /etc/rancher/k3s/k3s.yaml" | \
+  sed 's/127.0.0.1/10.100.10.1/' > ~/.kube/config
+kubectl get nodes
 ```
-
-### Kubernetes (Sealed Secrets)
-
-Secretos de aplicaciones (DB passwords, tokens).
-Almacenados de forma segura en `modules/services/k3s/sealedsecrets/`.
-
-```bash
-# 1. Crear secreto localmente (dry-run)
-kubectl create secret generic my-secret --from-literal=pass=1234 --dry-run=client -o yaml > secret.yaml
-
-# 2. Sellar secreto (cifrar)
-nix run .#seal -- secret.yaml modules/services/k3s/sealedsecrets/my-secret.yaml
-
-# 3. Borrar secreto original y comitear el sellado
-rm secret.yaml
-git add modules/services/k3s/sealedsecrets/my-secret.yaml
-```
-
-## 🌐 Acceso al Cluster
-
-El acceso a la API de Kubernetes está restringido a la VPN WireGuard.
-
-1.  **Configurar WireGuard**: Asegúrate de estar conectado a la VPN.
-2.  **Kubeconfig**:
-    ```bash
-    ssh admin@<IP_SERVER> "sudo cat /etc/rancher/k3s/k3s.yaml" | \
-      sed 's/127.0.0.1/<IP_WIREGUARD_SERVER>/' > ~/.kube/config-webslab
-    ```
-3.  **Uso**:
-    ```bash
-    export KUBECONFIG=~/.kube/config-webslab
-    kubectl get nodes
-    ```
-

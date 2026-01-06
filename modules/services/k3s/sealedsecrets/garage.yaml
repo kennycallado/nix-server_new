@@ -13,3 +13,17 @@ spec:
     metadata:
       name: garage-secrets
       namespace: garage
+---
+apiVersion: bitnami.com/v1alpha1
+kind: SealedSecret
+metadata:
+  name: garage-webui-auth
+  namespace: garage
+spec:
+  encryptedData:
+    AUTH_USER_PASS: AgCYlYY9tfOFzDPU4fVBCvaEyPBo/bKJA0j60rvdrhLKKVWWBCSessd6OAR610fD5aK6CLib76FPLflp0L8FX8fnylwMfd2C6kxGi5DM5I+rl/IbJphE3bdQNX1uBRMXE4uWlA1jKCh4Eu1T2gUVUDVWmf09ryE9XrxWnzpdZ+8osHnCGZ/f+7pA9Wkd9PsF/ozS7L9E/ZJYNSch804D0WFgk6cpaYFZJlCkZ7vP0N5dnwPI8QRAkGLg3WLkoHnrm2GCds/A1ad9kMyzAx/cQrMz/cgG3riVFEGr3xeH5CMo0YXH6f+fq4VLe1cpsPMf6d25UScXdacrsZFXrmHVvPPwJn5BoS+lzEt3FYb/EF05b207MrvjrxhtKdXiQu+6rsRf96KLXNYD5Ce3V9V4QRGMMyHConrt1k9cHOJFAYJbw9+A+DAVIdoHyvTDJWS/4GI5fDouHVTKjzg5jwlYh5EbKPYWSdAFbOOOolz8nc00Pko+S8HGXhI+Zq51UmkNRFkfg61GqQ6fUy3PKCn+HxI9XQ2g3CL4Qef6u5HxJrtT6HYlL65lCoH/aCuwnD/VfU2Q22euA+plrL/sX5KZT3LEEeUJGP4jV2gwV3W+wGyIr84oqU+MaUURM6RlTa8RrKQqaDdd7s/BU2PX+t4La31f8hu7vv0He6ot61rfx6jjxLzkdEjcGKHEZ/y7DSlhFpFh/ifrDumZZONFSJU3H6y8rjZnQt9enJA/l4IbX5tHtPEzc+KzusL0PqGWc+VyPKTkibvCjZjAG6M3/DIfQdBsnJE=
+  template:
+    metadata:
+      name: garage-webui-auth
+      namespace: garage
+    type: Opaque

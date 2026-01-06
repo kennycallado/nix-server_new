@@ -193,9 +193,12 @@ echo "Clave pública WireGuard:"
 echo "$WG_PUBLIC_KEY"
 echo ""
 
-echo "Re-encriptando secretos para incluir las nuevas claves del host..."
-cd "$SECRETS_DIR"
-$SCRIPT_BIN -q -c "$AGENIX_BIN -r" /dev/null
-
 echo ""
-echo "Claves SSH y WireGuard generadas y secretos actualizados para $HOST"
+echo "Claves SSH y WireGuard generadas para $HOST"
+echo ""
+echo "IMPORTANTE: Antes de hacer rekey, añade la clave pública a secrets.nix:"
+echo ""
+echo "  $HOST = \"$(cat "$PUB_FILE")\";"
+echo ""
+echo "Luego ejecuta manualmente:"
+echo "  cd secrets && nix run ..#agenix -- -r"

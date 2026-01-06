@@ -3,13 +3,8 @@
   system = "aarch64-linux";
   disk = "/dev/sda";
 
-  infra = {
-    provider = "hetzner";
-    type = "cax11";
-    location = "nbg1";
-  };
-
   deploy = {
+    ip = "46.224.152.241"; # Set after creating server in Hetzner Console
     sshUser = "admin";
     remoteBuild = true;
   };
@@ -17,7 +12,7 @@
   k3s = {
     enable = true;
     role = "agent";
-    serverAddr = "https://server-01:6443"; # Usa nombre DNS vía WireGuard
+    serverAddr = "https://server-01:6443"; # DNS via WireGuard
   };
 
   wireguard = {

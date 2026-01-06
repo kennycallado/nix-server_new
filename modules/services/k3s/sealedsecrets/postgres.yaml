@@ -28,3 +28,18 @@ spec:
       name: windmill-user
       namespace: postgres
     type: kubernetes.io/basic-auth
+---
+apiVersion: bitnami.com/v1alpha1
+kind: SealedSecret
+metadata:
+  name: cnpg-s3-creds
+  namespace: postgres
+spec:
+  encryptedData:
+    ACCESS_KEY_ID: AgAgH5oHdfOoMD2L83u/wJuTsM9/x/8hXUTdD9H7CSYEzX7BAUV1OHUuwpi/Jw7qeLMH3Qs9Pn5NYpvjZq1XkdP8zE4XNYabbxwe1Ea4rVciHzk+YFtIwrSVW6G0D76gRwUpnwYqpEHAR4fvzYkavAs5DKnwidyc8wluULlkGJ7f3tl6jDfMeAibK+dbTQmYr9SQvk6KEB59oX8oAFQdiVJFi5Sq5XypdEgntI6TsGtzsv4mHA4w4XVK2yVufjZSpNYFCja23XFZo080P+PWxBjH1K8jge1jHS/TwSx9y3o8Wja6qoRJTGqrHZMctFxSyPKIKUQMLdEVFdMaCzJUliSfG1/mokvFVlPfaYn0zH2ObuLb1bjqiwAufO5n3DF4nNTA5xF92xN+igXvdKTkdgu5EwAt3c0ivAyssplS4ILxSH/huYkppxbnVUsTZsVG8C+hy2fohgIz372LecegrR4aDV2A0h+Z3ZH2dMGH3ep+cG4K0yvyB7aJfnYMaQTk24zWu2byPFgiUlMfM8MpzyVTY9Z64g+mnHjDs9VgbPPlJv0NRHYqcEzzCg/+HZLGwYzCLDJ6tK+NM6WNhDQm5aDERgN9IAeWqM4ejmMT5bJra79kV8AG1rF5gpx6KN+1dojBxBSwhv+PRVGNalCHH8+WCHoBAV0zFqOuD6akGQQPnMR1PibWxQUJIKn8iW+84IozxTUXxj+37+0fuh+1cjaqVW32SxHU8a3hkQ==
+    ACCESS_SECRET_KEY: AgCmeUEXkNzl5vrfteUhUMvurAg+V/zm3tj5WJyMQmx8mjGadbkUZm2MDqsffe+YWvTItafuC+HIXECpJSWMKJ/W2ZOlvdDskCySEwdRNEGpiYJ+pqWBrDWTi61H8zel7PjK5edmw4qaB4y44cvIOeKEaL+9jfjUGj7Xo1BnUrw6X3UZqNDd185csqS5bJdhZclmheqhPMWpOffPruIESjwyvGfFneo/pTS8hYUsa15DxsWVHEYHeE1BvFccN8GRgm7m1tfJtG6PzqoOwwaFTIaEl0F+CDJUFLNmKhd0ZG5afYsj+BUPnom8y1MUJOcaIX4+e2T4p5RE1OkspqoFVhamdRmZzWAOcx11YiEZvncnd4ragROGEtlShRqTPOqXAEgrRkWgOU0D5i0gXCafv/30rdUVHx+hZg8U1Kxv/8uJah2ifXrBcUEYMVhZGGElONxlXBeuMnzFre+Zk145Qm+ASANayIyEBKEY5nxvOUNiPjkfk6scnI+ZaF0hYAs7D4hjZ1wM4aZVYruYCYLlmJ7kFOh11//PmwgW8rN0TGNEKWdy8LFPi3A7zY/LAtBlNYttDw74ZauNxBA45/em7BVGM4sj3jqTpgGUjsXsyDLSsCorGOq/DSL5jDIUS4wIXq++9A9i9Q5C//qwixUghV4q0qmFO0kgHFRRBhiM3RQN8wsv9mwyuLYOHuFayb+5DQ4fCYOFIy2z+cAu2C2spxX6O9RGiWiu/QqikqilwLdzVaaGZed9TPQRYzE+DLKGlp9Wgcyhx+ouz2smQyQAuXRa
+  template:
+    metadata:
+      name: cnpg-s3-creds
+      namespace: postgres
+    type: Opaque

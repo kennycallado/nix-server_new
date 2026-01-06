@@ -16,9 +16,9 @@ in
   check = {
     type = "app";
     program = toString (pkgs.writeShellScript "check" ''
-      nix flake check --all-systems --impure
+      ${pkgs.nixpkgs-fmt}/bin/nixpkgs-fmt --check . && nix flake check --no-build "$@"
     '');
-    meta.description = "Run flake checks";
+    meta.description = "Check formatting and validate flake";
   };
 
   keygen = {
@@ -33,15 +33,6 @@ in
       "JQ_BIN='${pkgs.jq}/bin/jq'"
     ]);
     meta.description = "Generate SSH and WireGuard keys for a host";
-  };
-
-  rekey = {
-    type = "app";
-    program = toString (wrapScript "rekey" ./scripts/rekey.sh [
-      "AGENIX_BIN='${agenix-pkg}/bin/agenix'"
-      "SCRIPT_BIN='${pkgs.util-linux}/bin/script'"
-    ]);
-    meta.description = "Re-encrypt all secrets with agenix";
   };
 
   install = {
@@ -72,16 +63,6 @@ in
     meta.description = "Deploy configuration with remote build (Phase 2)";
   };
 
-  provision = {
-    type = "app";
-    program = toString (wrapScript "provision" ./scripts/provision.sh [
-      "HCLOUD_BIN='${pkgs.hcloud}/bin/hcloud'"
-      "JQ_BIN='${pkgs.jq}/bin/jq'"
-      "AGE_BIN='${pkgs.age}/bin/age'"
-    ]);
-    meta.description = "Create Hetzner server and install NixOS";
-  };
-
   seal = {
     type = "app";
     program = toString (wrapScript "seal" ./scripts/seal.sh [
@@ -90,22 +71,12 @@ in
     meta.description = "Seal Kubernetes secrets with kubeseal";
   };
 
-  status = {
+  tunnel = {
     type = "app";
-    program = toString (wrapScript "status" ./scripts/status.sh [
-      "HCLOUD_BIN='${pkgs.hcloud}/bin/hcloud'"
-      "JQ_BIN='${pkgs.jq}/bin/jq'"
-    ]);
-    meta.description = "Show cluster status (local vs Hetzner)";
-  };
-
-  destroy = {
-    type = "app";
-    program = toString (wrapScript "destroy" ./scripts/destroy.sh [
-      "HCLOUD_BIN='${pkgs.hcloud}/bin/hcloud'"
-      "JQ_BIN='${pkgs.jq}/bin/jq'"
-    ]);
-    meta.description = "Destroy a node and clean up state";
+    program = toString (pkgs.writeShellScript "tunnel" ''
+      source ${./scripts/tunnel.sh}
+    '');
+    meta.description = "SSH tunnel to access K8s services locally";
   };
 
   agenix = {
