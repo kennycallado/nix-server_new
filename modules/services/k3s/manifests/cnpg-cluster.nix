@@ -5,7 +5,7 @@
 # - windmill-user: usuario windmill para la aplicación
 # - cnpg-s3-creds: credenciales S3 para backups a Garage
 #
-{ pkgs, lib ? pkgs.lib, serverToleration ? [ ] }:
+{ pkgs, lib ? pkgs.lib, serverToleration ? [ ], backupsConfig }:
 
 let
   # Namespace
@@ -68,6 +68,78 @@ let
         ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO windmill_user;
   '';
 
+  # Custom Metrics for Windmill (Community Edition Workaround)
+  # Format follows CNPG custom queries spec:
+  # https://cloudnative-pg.io/documentation/current/monitoring/#user-defined-metrics
+  metricsConfigMap = ''
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: windmill-metrics
+      namespace: postgres
+      labels:
+        cnpg.io/reload: "true"
+    data:
+      queries: |
+        windmill_workers_active:
+          query: |
+            SELECT count(*) as count 
+            FROM worker_ping 
+            WHERE ping_at > NOW() - INTERVAL '30 seconds'
+          target_databases:
+            - windmill
+          metrics:
+            - count:
+                usage: "GAUGE"
+                description: "Number of active Windmill workers"
+
+        windmill_jobs_completed:
+          query: |
+            SELECT 
+              COALESCE(j.kind::text, 'unknown') as kind,
+              c.status::text as status,
+              count(*) as count
+            FROM v2_job_completed c
+            LEFT JOIN v2_job j ON c.id = j.id
+            WHERE c.completed_at > NOW() - INTERVAL '1 hour'
+            GROUP BY j.kind, c.status
+          target_databases:
+            - windmill
+          metrics:
+            - kind:
+                usage: "LABEL"
+                description: "Type of the job (script, flow, etc)"
+            - status:
+                usage: "LABEL"
+                description: "Completion status of the job"
+            - count:
+                usage: "GAUGE"
+                description: "Number of completed jobs in the last hour"
+
+        windmill_jobs_queued:
+          query: |
+            SELECT 
+              COALESCE(j.kind::text, 'unknown') as kind,
+              CASE WHEN q.running THEN 'running' ELSE 'queued' END as status,
+              count(*) as count
+            FROM v2_job_queue q
+            LEFT JOIN v2_job j ON q.id = j.id
+            WHERE q.created_at > NOW() - INTERVAL '1 hour'
+            GROUP BY j.kind, q.running
+          target_databases:
+            - windmill
+          metrics:
+            - kind:
+                usage: "LABEL"
+                description: "Type of the job (script, flow, etc)"
+            - status:
+                usage: "LABEL"
+                description: "Queue status (running or queued)"
+            - count:
+                usage: "GAUGE"
+                description: "Number of jobs in queue"
+  '';
+
   # PostgreSQL Cluster resource (CRD from CNPG operator)
   cluster = ''
     apiVersion: postgresql.cnpg.io/v1
@@ -124,6 +196,13 @@ let
             operator: Exists
             effect: NoSchedule
 
+      # Monitoring - enables PodMonitor for Prometheus
+      monitoring:
+        enablePodMonitor: true
+        customQueriesConfigMap:
+          - name: windmill-metrics
+            key: queries
+
       # Backups to Garage (S3-compatible)
       backup:
         barmanObjectStore:
@@ -140,7 +219,7 @@ let
             compression: gzip
           data:
             compression: gzip
-        retentionPolicy: "7d"
+        retentionPolicy: "${backupsConfig.retention}"
   '';
 
   # Scheduled backup
@@ -162,6 +241,7 @@ let
     namespace
     initConfigMap
     appInitConfigMap
+    metricsConfigMap
     cluster
     scheduledBackup
   ];
